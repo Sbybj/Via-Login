@@ -81,6 +81,8 @@ jobs:
               private static final String KEY = "ViaBiometricKey";
               private static final Executor EXECUTOR = Executors.newSingleThreadExecutor();
 
+              // Called from Shell.onCreate: every fresh process/activity launch must verify.
+              // No "logged in" preference is stored; only biometric enrollment is persistent.
               public static void show(final Activity a) {
                   final SharedPreferences sp = a.getSharedPreferences(PREF, 0);
                   if (Build.VERSION.SDK_INT >= 28 && sp.getBoolean(BIO, false)) {
@@ -169,6 +171,8 @@ jobs:
                               }
                               @Override public void onAuthenticationError(int code, CharSequence msg) {
                                   a.runOnUiThread(() -> showPassword(a, sp));
+                              }
+                              @Override public void onAuthenticationFailed() {
                               }
                           });
                       BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
