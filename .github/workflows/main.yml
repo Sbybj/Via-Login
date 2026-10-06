@@ -77,7 +77,6 @@ jobs:
 
           public final class LoginGate {
               private static final String PREF = "via_gate";
-              private static final String LOGGED = "logged";
               private static final String BIO = "biometric_enabled";
               private static final String KEY = "ViaBiometricKey";
               private static final Executor EXECUTOR = Executors.newSingleThreadExecutor();
@@ -85,7 +84,7 @@ jobs:
               public static void show(final Activity a) {
                   final SharedPreferences sp = a.getSharedPreferences(PREF, 0);
                   if (Build.VERSION.SDK_INT >= 28 && sp.getBoolean(BIO, false)) {
-                      if (authenticate(a, () -> {})) return;
+                      if (authenticate(a, sp)) return;
                       sp.edit().putBoolean(BIO, false).apply();
                   }
                   showPassword(a, sp);
@@ -126,7 +125,6 @@ jobs:
                   login.setOnClickListener(v -> {
                       if ("123".equals(user.getText().toString()) &&
                           "135359".equals(pass.getText().toString())) {
-                          sp.edit().putBoolean(LOGGED, true).apply();
                           d.dismiss();
                           if (Build.VERSION.SDK_INT >= 28 && !sp.getBoolean(BIO, false)) {
                               offerBiometric(a, sp);
@@ -139,10 +137,6 @@ jobs:
                       d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
                   });
                   d.show();
-              }
-
-              private static boolean biometricReady() {
-                  return Build.VERSION.SDK_INT >= 28;
               }
 
               private static Cipher makeCipher() throws Exception {
@@ -166,17 +160,15 @@ jobs:
                   return cipher;
               }
 
-              private static boolean authenticate(final Activity a, final Runnable onSuccess) {
-                  if (!biometricReady()) return false;
+              private static boolean authenticate(final Activity a, final SharedPreferences sp) {
                   try {
                       Cipher cipher = makeCipher();
                       BiometricPrompt prompt = new BiometricPrompt(a, EXECUTOR,
                           new BiometricPrompt.AuthenticationCallback() {
                               @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
-                                  a.runOnUiThread(onSuccess);
                               }
                               @Override public void onAuthenticationError(int code, CharSequence msg) {
-                                  a.runOnUiThread(() -> {});
+                                  a.runOnUiThread(() -> showPassword(a, sp));
                               }
                           });
                       BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
@@ -192,7 +184,6 @@ jobs:
               }
 
               private static void offerBiometric(final Activity a, final SharedPreferences sp) {
-                  if (!biometricReady()) return;
                   try {
                       Cipher cipher = makeCipher();
                       BiometricPrompt prompt = new BiometricPrompt(a, EXECUTOR,
