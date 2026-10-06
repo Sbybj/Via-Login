@@ -1,18 +1,32 @@
-name: Build Via APK
+name: Inspect Via APK
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  inspect:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show files
-        run: ls -lh
+      - name: Download Apktool
+        run: |
+          wget -q https://github.com/iBotPeaches/Apktool/releases/latest/download/apktool.jar -O apktool.jar
+          java -version
+          ls -lh apktool.jar
 
-      - name: Test
-        run: echo "GitHub Actions is working"
+      - name: Decode APK
+        run: |
+          java -jar apktool.jar d Via_7.3.4.apk -o decoded -f
+
+      - name: Show manifest and launcher
+        run: |
+          echo "===== MANIFEST ====="
+          sed -n '1,240p' decoded/AndroidManifest.xml
+          echo "===== ACTIVITY/LAUNCHER SEARCH ====="
+          grep -Rni -E 'MAIN|LAUNCHER' decoded/AndroidManifest.xml || true
+          echo "===== SMALI DIRECTORIES ====="
+          find decoded -maxdepth 2 -type d -name 'smali*' -print
+          echo "===== PACKAGE HINTS ====="
+          grep -Rni 'mark.via' decoded/smali* | head -30 || true
