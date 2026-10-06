@@ -22,7 +22,7 @@ jobs:
 
       - name: Decode APK
         run: |
-          java -jar apktool.jar d Via_7.3.4.apk -o decoded -f
+          apktool d Via_7.3.4.apk -o decoded -f
 
       - name: Show manifest and launcher
         run: |
