@@ -138,7 +138,9 @@ jobs:
               }
 
               private void openVia() {
-                  startActivity(new Intent(this, Shell.class));
+                  Intent i = new Intent();
+                  i.setClassName(this, "mark.via.Shell");
+                  startActivity(i);
                   finish();
               }
           }
