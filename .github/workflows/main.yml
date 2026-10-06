@@ -2,6 +2,10 @@ name: Inspect Via APK
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'Via_7.3.4.apk'
+      - '.github/workflows/main.yml'
 
 jobs:
   inspect:
