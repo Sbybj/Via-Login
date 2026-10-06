@@ -127,10 +127,18 @@ jobs:
           PLATFORM=$(ls -d "$SDK"/platforms/android-* | sort -V | tail -1)
           BUILD_TOOLS=$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)
           curl -L --fail -o smali.jar https://repo1.maven.org/maven2/org/smali/smali/2.5.2/smali-2.5.2.jar
+          curl -L --fail -o dexlib2.jar https://repo1.maven.org/maven2/org/smali/dexlib2/2.5.2/dexlib2-2.5.2.jar
+          curl -L --fail -o util.jar https://repo1.maven.org/maven2/org/smali/util/2.5.2/util-2.5.2.jar
+          curl -L --fail -o jcommander.jar https://repo1.maven.org/maven2/com/beust/jcommander/1.64/jcommander-1.64.jar
+          curl -L --fail -o antlr.jar https://repo1.maven.org/maven2/org/antlr/antlr/3.5.2/antlr-3.5.2.jar
+          curl -L --fail -o antlr-runtime.jar https://repo1.maven.org/maven2/org/antlr/antlr-runtime/3.5.2/antlr-runtime-3.5.2.jar
+          curl -L --fail -o stringtemplate.jar https://repo1.maven.org/maven2/org/antlr/stringtemplate/3.2.1/stringtemplate-3.2.1.jar
+          curl -L --fail -o guava.jar https://repo1.maven.org/maven2/com/google/guava/guava/27.1-android/guava-27.1-android.jar
+          curl -L --fail -o jsr305.jar https://repo1.maven.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar
           mkdir -p buildsrc/classes buildsrc/dex
           javac -source 8 -target 8 -classpath "$PLATFORM/android.jar" -d buildsrc/classes buildsrc/mark/via/LoginGate.java
           jar cf buildsrc/login.jar -C buildsrc/classes .
-          java -cp smali.jar org.jf.smali.Main assemble decoded/smali -o patched-original.dex
+          java -cp "smali.jar:dexlib2.jar:util.jar:jcommander.jar:antlr.jar:antlr-runtime.jar:stringtemplate.jar:guava.jar:jsr305.jar" org.jf.smali.Main assemble decoded/smali -o patched-original.dex
           "$BUILD_TOOLS/d8" --release --lib "$PLATFORM/android.jar" patched-original.dex buildsrc/login.jar --output buildsrc/dex
           cp buildsrc/dex/classes.dex merged.dex
           ls -lh merged.dex
