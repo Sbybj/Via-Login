@@ -1,0 +1,192 @@
+name: Build Via Login APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Via_7.3.4.apk'
+      - '.github/workflows/main.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Apktool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apktool
+          apktool --version
+
+      - name: Prepare original dex
+        run: unzip -p Via_7.3.4.apk classes.dex > original.dex
+
+      - name: Decode APK
+        run: apktool d Via_7.3.4.apk -o decoded -f
+
+      - name: Patch launcher manifest
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("decoded/AndroidManifest.xml")
+          s = p.read_text()
+          m = re.search(r'<activity[^>]+android:name="mark\.via\.Shell"[^>]*>.*?</activity>', s, re.S)
+          if not m:
+              raise SystemExit("mark.via.Shell activity not found")
+          block = m.group(0)
+          block = re.sub(r'<intent-filter>\s*<action[^>]+android:name="android\.intent\.action\.MAIN"[^>]*/>\s*<category[^>]+android\.intent\.category\.LAUNCHER"[^>]*/>\s*</intent-filter>', '', block, flags=re.S)
+          block = block.replace('android:exported="true"', 'android:exported="false"')
+          s = s[:m.start()] + block + s[m.end():]
+          app_end = s.find('>', s.find('<application'))
+          if app_end < 0:
+              raise SystemExit("application tag not found")
+          login = '''
+          <activity android:name="mark.via.LoginGate" android:exported="true">
+              <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+              </intent-filter>
+          </activity>'''
+          s = s[:app_end+1] + login + s[app_end+1:]
+          p.write_text(s)
+          PY
+          grep -n 'LoginGate\|mark.via.Shell' decoded/AndroidManifest.xml
+
+      - name: Create login gate
+        run: |
+          mkdir -p buildsrc/mark/via
+          cat > buildsrc/mark/via/LoginGate.java <<'JAVA'
+          package mark.via;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Typeface;
+          import android.text.InputType;
+          import android.view.Gravity;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+          import android.widget.Toast;
+
+          public class LoginGate extends Activity {
+              private static final String PREF = "via_gate";
+              private static final String LOGGED = "logged";
+
+              @Override public void onCreate(Bundle state) {
+                  super.onCreate(state);
+                  SharedPreferences sp = getSharedPreferences(PREF, 0);
+                  if (sp.getBoolean(LOGGED, false)) {
+                      openVia();
+                      return;
+                  }
+
+                  LinearLayout box = new LinearLayout(this);
+                  box.setOrientation(LinearLayout.VERTICAL);
+                  box.setGravity(Gravity.CENTER);
+                  int pad = (int)(24 * getResources().getDisplayMetrics().density);
+                  box.setPadding(pad, pad, pad, pad);
+
+                  TextView title = new TextView(this);
+                  title.setText("Via");
+                  title.setTextSize(28);
+                  title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                  title.setGravity(Gravity.CENTER);
+                  box.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+                  TextView hint = new TextView(this);
+                  hint.setText("请输入账号和密码");
+                  hint.setGravity(Gravity.CENTER);
+                  box.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+
+                  EditText user = new EditText(this);
+                  user.setHint("账号");
+                  user.setSingleLine(true);
+                  box.addView(user, new LinearLayout.LayoutParams(-1, -2));
+
+                  EditText pass = new EditText(this);
+                  pass.setHint("密码");
+                  pass.setSingleLine(true);
+                  pass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                  box.addView(pass, new LinearLayout.LayoutParams(-1, -2));
+
+                  Button login = new Button(this);
+                  login.setText("登录");
+                  box.addView(login, new LinearLayout.LayoutParams(-1, -2));
+
+                  TextView note = new TextView(this);
+                  note.setText("首次登录成功后，下次自动进入");
+                  note.setGravity(Gravity.CENTER);
+                  box.addView(note, new LinearLayout.LayoutParams(-1, -2));
+
+                  login.setOnClickListener(v -> {
+                      if ("123".equals(user.getText().toString()) &&
+                          "135359".equals(pass.getText().toString())) {
+                          sp.edit().putBoolean(LOGGED, true).apply();
+                          openVia();
+                      } else {
+                          Toast.makeText(this, "账号或密码错误", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+
+                  setContentView(box);
+              }
+
+              private void openVia() {
+                  Intent i = new Intent();
+                  i.setClassName(this, "mark.via.Shell");
+                  startActivity(i);
+                  finish();
+              }
+          }
+          JAVA
+
+      - name: Compile and merge DEX
+        run: |
+          SDK="$ANDROID_HOME"
+          PLATFORM=$(ls -d "$SDK"/platforms/android-* | sort -V | tail -1)
+          BUILD_TOOLS=$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)
+          mkdir -p buildsrc/classes buildsrc/dex
+          javac -source 8 -target 8 -classpath "$PLATFORM/android.jar" -d buildsrc/classes buildsrc/mark/via/LoginGate.java
+          jar cf buildsrc/login.jar -C buildsrc/classes .
+          "$BUILD_TOOLS/d8" --release --lib "$PLATFORM/android.jar" original.dex buildsrc/login.jar --output buildsrc/dex
+          cp buildsrc/dex/classes.dex merged.dex
+          ls -lh merged.dex
+
+      - name: Build APK resources
+        run: apktool b decoded -o resource-patched.apk
+
+      - name: Replace DEX
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          src='resource-patched.apk'
+          dst='patched.apk'
+          with zipfile.ZipFile(src,'r') as zin, zipfile.ZipFile(dst,'w',zipfile.ZIP_DEFLATED) as zout:
+              for item in zin.infolist():
+                  if item.filename == 'classes.dex':
+                      continue
+                  zout.writestr(item, zin.read(item.filename))
+              zout.write('merged.dex','classes.dex')
+          PY
+
+      - name: Sign APK
+        run: |
+          SDK="$ANDROID_HOME"
+          BUILD_TOOLS=$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)
+          keytool -genkeypair -v -keystore release.jks -alias via -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Via" >/dev/null 2>&1
+          mkdir -p out
+          "$BUILD_TOOLS/zipalign" -f 4 patched.apk out/Via-Login-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign --ks release.jks --ks-pass pass:android --key-pass pass:android --out out/Via-Login.apk out/Via-Login-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose out/Via-Login.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Via-Login-APK
+          path: out/Via-Login.apk
