@@ -14,11 +14,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Apktool
+      - name: Install Apktool
         run: |
-          wget -q https://github.com/iBotPeaches/Apktool/releases/latest/download/apktool.jar -O apktool.jar
-          java -version
-          ls -lh apktool.jar
+          sudo apt-get update
+          sudo apt-get install -y apktool
+          apktool --version
 
       - name: Decode APK
         run: |
