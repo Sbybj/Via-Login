@@ -229,7 +229,8 @@ public class FreshDashboardActivity extends Activity {
         addStat(c, "GPU 负载", "未接入传感器");
         addDivider(c); addStat(c, "实时 FPS", "未接入帧率源");
         addDivider(c); addStat(c, "屏幕刷新率", "请求 120Hz（系统可能限制）");
-        addDivider(c); monitorRoot = label(rootValue == null ? "检测中" : rootValue.getText().toString(), 11, white, true);\n        LinearLayout rr = row(); rr.setPadding(0, dp(13), 0, dp(13)); rr.addView(label("Root 状态", 12, muted, false), new LinearLayout.LayoutParams(0, -2, 1)); rr.addView(monitorRoot); c.addView(rr);
+        addDivider(c); monitorRoot = label(rootValue == null ? "检测中" : rootValue.getText().toString(), 11, white, true);
+        LinearLayout rr = row(); rr.setPadding(0, dp(13), 0, dp(13)); rr.addView(label("Root 状态", 12, muted, false), new LinearLayout.LayoutParams(0, -2, 1)); rr.addView(monitorRoot); c.addView(rr);
         TextView note = label("说明：未接入的数据不会用模拟数值填充。", 10, muted, false);
         note.setPadding(0, dp(16), 0, 0); p.addView(note);
         return p;
