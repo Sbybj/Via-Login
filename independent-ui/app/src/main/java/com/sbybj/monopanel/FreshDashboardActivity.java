@@ -242,20 +242,131 @@ public class FreshDashboardActivity extends Activity {
     }
 
     private LinearLayout buildFeaturePage() {
-        LinearLayout p = pageBase("功能中心", "FEATURE MODULES  /  接口状态");
-        LinearLayout c = card(); c.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams cp = matchWrap(); cp.topMargin = dp(22); p.addView(c, cp);
-        LinearLayout text = new LinearLayout(this); text.setOrientation(LinearLayout.VERTICAL);
-        c.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
-        text.addView(label("透视", 17, white, true));
-        text.addView(label("功能开关与接口占位，尚未连接", 10, muted, false));
-        Switch sw = new Switch(this);
-        sw.setOnCheckedChangeListener((b, checked) ->
-            Toast.makeText(this, checked ? "透视模块未接入，当前不会执行操作" : "已关闭", Toast.LENGTH_SHORT).show());
-        c.addView(sw);
-        TextView desc = label("除透视模块外，其他系统监控、刷新设置和页面导航均可独立使用。", 11, muted, false);
-        desc.setPadding(2, dp(18), 2, 0); p.addView(desc);
+        LinearLayout p = pageBase("设备信息", "DEVICE INFORMATION  /  HARDWARE DETAILS");
+        LinearLayout c = card();
+        c.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams cp = matchWrap();
+        cp.topMargin = dp(22);
+        p.addView(c, cp);
+
+        addInfoStat(c, "设备品牌", android.os.Build.MANUFACTURER);
+        addDivider(c);
+        addInfoStat(c, "设备型号", android.os.Build.MODEL);
+        addDivider(c);
+        addInfoStat(c, "设备代号", android.os.Build.DEVICE + " / " + android.os.Build.PRODUCT);
+        addDivider(c);
+        String soc = "";
+        if (android.os.Build.VERSION.SDK_INT >= 31) soc = android.os.Build.SOC_MODEL;
+        if (soc == null || soc.trim().isEmpty()) soc = android.os.Build.HARDWARE;
+        addInfoStat(c, "SoC / 平台", displayOrUnavailable(soc));
+        addDivider(c);
+        addInfoStat(c, "CPU 型号", readCpuModel());
+        addDivider(c);
+        addInfoStat(c, "CPU 核心数", Runtime.getRuntime().availableProcessors() + " 核");
+        addDivider(c);
+        addInfoStat(c, "CPU 最高频率", readMaxCpuFrequency());
+        addDivider(c);
+        addInfoStat(c, "系统版本", "Android " + android.os.Build.VERSION.RELEASE
+            + " (API " + android.os.Build.VERSION.SDK_INT + ")");
+        addDivider(c);
+        addInfoStat(c, "系统构建", displayOrUnavailable(android.os.Build.DISPLAY));
+        addDivider(c);
+        addInfoStat(c, "CPU ABI", android.os.Build.SUPPORTED_ABIS.length > 0
+            ? android.os.Build.SUPPORTED_ABIS[0] : "未知");
+        addDivider(c);
+        addInfoStat(c, "总运行内存", readTotalMemory());
+        addDivider(c);
+        addInfoStat(c, "屏幕分辨率", readScreenResolution());
+        addDivider(c);
+        addInfoStat(c, "屏幕刷新率", readScreenRefreshRate());
+
+        TextView note = label("以上信息来自 Android 系统属性、/proc 与设备显示参数。个别厂商可能限制部分硬件字段读取。", 10, muted, false);
+        note.setPadding(dp(2), dp(16), dp(2), 0);
+        p.addView(note);
         return p;
+    }
+
+    private void addInfoStat(LinearLayout parent, String name, String value) {
+        LinearLayout r = row();
+        r.setPadding(0, dp(12), 0, dp(12));
+        TextView key = label(name, 11, muted, false);
+        r.addView(key, new LinearLayout.LayoutParams(dp(104), -2));
+        TextView val = label(displayOrUnavailable(value), 12, white, true);
+        val.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        r.addView(val, new LinearLayout.LayoutParams(0, -2, 1));
+        parent.addView(r);
+    }
+
+    private String displayOrUnavailable(String value) {
+        return value == null || value.trim().isEmpty() ? "系统未提供" : value.trim();
+    }
+
+    private String readCpuModel() {
+        String[] keys = {"Hardware", "model name", "Processor", "Model"};
+        try (BufferedReader reader = new BufferedReader(new FileReader("/proc/cpuinfo"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                int split = line.indexOf(':');
+                if (split <= 0) continue;
+                String key = line.substring(0, split).trim();
+                for (String candidate : keys) {
+                    if (candidate.equalsIgnoreCase(key)) {
+                        String value = line.substring(split + 1).trim();
+                        if (!value.isEmpty()) return value;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return displayOrUnavailable(android.os.Build.HARDWARE);
+    }
+
+    private String readMaxCpuFrequency() {
+        long maxKHz = 0;
+        int cores = Math.max(1, Runtime.getRuntime().availableProcessors());
+        for (int i = 0; i < cores; i++) {
+            String[] paths = {
+                "/sys/devices/system/cpu/cpu" + i + "/cpufreq/cpuinfo_max_freq",
+                "/sys/devices/system/cpu/cpu" + i + "/cpufreq/scaling_max_freq"
+            };
+            for (String path : paths) {
+                try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
+                    String value = reader.readLine();
+                    if (value != null) maxKHz = Math.max(maxKHz, Long.parseLong(value.trim()));
+                    if (maxKHz > 0) break;
+                } catch (Exception ignored) {}
+            }
+        }
+        return maxKHz > 0 ? String.format(Locale.US, "%.2f GHz", maxKHz / 1000000.0)
+            : "系统限制读取";
+    }
+
+    private String readTotalMemory() {
+        try {
+            android.app.ActivityManager.MemoryInfo info = new android.app.ActivityManager.MemoryInfo();
+            ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(info);
+            return String.format(Locale.US, "%.1f GB", info.totalMem / 1073741824.0);
+        } catch (Exception e) {
+            return "读取失败";
+        }
+    }
+
+    private String readScreenResolution() {
+        try {
+            android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
+            getWindowManager().getDefaultDisplay().getRealMetrics(metrics);
+            return metrics.widthPixels + " × " + metrics.heightPixels;
+        } catch (Exception e) {
+            return "读取失败";
+        }
+    }
+
+    private String readScreenRefreshRate() {
+        try {
+            float rate = getWindowManager().getDefaultDisplay().getRefreshRate();
+            return String.format(Locale.US, "%.0f Hz", rate);
+        } catch (Exception e) {
+            return "读取失败";
+        }
     }
 
     private LinearLayout buildSettingsPage() {
