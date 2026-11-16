@@ -47,7 +47,8 @@ public final class RootInfoReader {
         }).start();
     }
     public interface CpuCallback { void onResult(boolean granted,long[] counters); }
-\n    public static void read(Activity activity, Callback callback){
+
+    public static void read(Activity activity, Callback callback){
         new Thread(() -> {
             boolean granted=false;
             String details="未取得系统信息";
