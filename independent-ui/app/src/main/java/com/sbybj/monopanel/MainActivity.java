@@ -8,6 +8,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
@@ -31,7 +34,8 @@ public class MainActivity extends Activity {
     private final int BLACK=Color.rgb(4,4,4), WHITE=Color.rgb(245,245,245), MUTED=Color.rgb(150,150,150);
     private final Handler handler=new Handler(Looper.getMainLooper());
     private LinearLayout root;
-    private TextView cpuValue, cpuDetail, runtimeValue, statusValue, rootStatus;
+    private TextView cpuDetail, runtimeValue, statusValue, rootStatus;
+    private CpuGaugeView cpuGauge;
     private long startedAt, previousRootTotal=-1, previousRootIdle=-1;
     private final ArrayList<String> logs=new ArrayList<>();
     private final String[] ids={"module_1","module_2","module_3","module_4"};
@@ -39,7 +43,7 @@ public class MainActivity extends Activity {
     private final String[] names={"模块一","模块二","模块三","模块四"};
     private final String[] descriptions={"独立模块接口 A","独立模块接口 B","独立模块接口 C","独立模块接口 D"};
     private final Runnable monitor=new Runnable(){ public void run(){
-        if(cpuValue!=null){ sampleRootCpu(); updateRuntime(); }
+        if(cpuGauge!=null){ sampleRootCpu(); updateRuntime(); }
         handler.postDelayed(this,2000);
     }};
 
@@ -98,7 +102,9 @@ public class MainActivity extends Activity {
         LinearLayout top=horizontal();top.addView(text("运行状态",15,MUTED,false),new LinearLayout.LayoutParams(0,dp(30),1));
         statusValue=text("● 运行中",15,WHITE,true);top.addView(statusValue);status.addView(top);
         LinearLayout stats=horizontal();
-        LinearLayout cpu=vertical();cpu.addView(text("CPU 总占用率",13,MUTED,false));cpuValue=text("--%",30,WHITE,true);cpu.addView(cpuValue);cpuDetail=text("读取系统统计中",11,MUTED,false);cpu.addView(cpuDetail);
+        LinearLayout cpu=vertical();cpu.addView(text("CPU 总占用率",13,MUTED,false));
+        cpuGauge=new CpuGaugeView();cpu.addView(cpuGauge,lp(116,116));
+        cpuDetail=text("Root 读取 /proc/stat",11,MUTED,false);cpu.addView(cpuDetail);
         stats.addView(cpu,new LinearLayout.LayoutParams(0,-2,1));
         LinearLayout rt=vertical();rt.addView(text("本次运行时长",13,MUTED,false));runtimeValue=text("00:00:00",23,WHITE,true);rt.addView(runtimeValue);
         stats.addView(rt,new LinearLayout.LayoutParams(0,-2,1));status.addView(stats);
@@ -163,9 +169,9 @@ public class MainActivity extends Activity {
     }
     private void sampleRootCpu(){
         RootInfoReader.readCpuStat(this,(granted,counters)->{
-            if(cpuValue==null)return;
+            if(cpuGauge==null)return;
             if(!granted||counters==null||counters.length<2){
-                cpuValue.setText("N/A");
+                cpuGauge.setUnavailable();
                 cpuDetail.setText("Root 未授权，无法读取 /proc/stat");
                 previousRootTotal=-1;previousRootIdle=-1;return;
             }
@@ -174,16 +180,41 @@ public class MainActivity extends Activity {
                 long dt=total-previousRootTotal, di=idle-previousRootIdle;
                 if(dt>0){
                     int percent=(int)Math.max(0,Math.min(100,Math.round((dt-di)*100.0/dt)));
-                    cpuValue.setText(percent+"%");
+                    cpuGauge.setPercent(percent);
                     cpuDetail.setText("Root 读取 /proc/stat · 实时刷新");
                 }
             } else {
-                cpuValue.setText("--%");
+                cpuGauge.setUnavailable();
                 cpuDetail.setText("Root 已连接，正在采集基准值…");
             }
             previousRootTotal=total;previousRootIdle=idle;
         });
     }
+
+    /** Monochrome circular CPU utilization gauge. */
+    private class CpuGaugeView extends View {
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF arc=new RectF();
+        private int percent=-1;
+        CpuGaugeView(){super(MainActivity.this);}
+        void setPercent(int value){percent=Math.max(0,Math.min(100,value));invalidate();}
+        void setUnavailable(){percent=-1;invalidate();}
+        @Override protected void onDraw(Canvas canvas){
+            super.onDraw(canvas);
+            float cx=getWidth()/2f, cy=getHeight()/2f;
+            float stroke=dp(8), radius=Math.min(getWidth(),getHeight())/2f-stroke;
+            arc.set(cx-radius,cy-radius,cx+radius,cy+radius);
+            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(stroke);paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setColor(Color.rgb(55,55,55));canvas.drawArc(arc,-90,360,false,paint);
+            if(percent>=0){paint.setColor(WHITE);canvas.drawArc(arc,-90,360f*percent/100f,false,paint);}
+            paint.setStyle(Paint.Style.FILL);paint.setColor(WHITE);paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTypeface(Typeface.create(Typeface.DEFAULT,Typeface.BOLD));paint.setTextSize(dp(27));
+            String value=percent<0?"--":percent+"%";
+            Paint.FontMetrics fm=paint.getFontMetrics();
+            canvas.drawText(value,cx,cy-(fm.ascent+fm.descent)/2f,paint);
+        }
+    }
+
     private void updateRuntime(){
         long sec=(SystemClock.elapsedRealtime()-startedAt)/1000;
         runtimeValue.setText(String.format(Locale.getDefault(),"%02d:%02d:%02d",sec/3600,(sec/60)%60,sec%60));
