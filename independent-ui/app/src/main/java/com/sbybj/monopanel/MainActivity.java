@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
     private final String[] names={"模块一","模块二","模块三","模块四"};
     private final String[] descriptions={"独立模块接口 A","独立模块接口 B","独立模块接口 C","独立模块接口 D"};
     private final Runnable monitor=new Runnable(){ public void run(){
-        if(cpuHistory!=null){ sampleRootCpu(); updateRuntime(); }
+        if(runtimeValue!=null){ updateRuntime(); }
         handler.postDelayed(this,100);
     }};
 
@@ -242,7 +242,7 @@ public class MainActivity extends Activity {
     }
     private void showSettings(){
         initPage("界面设置");LinearLayout c=vertical();c.setPadding(dp(16),dp(12),dp(16),dp(12));
-        c.addView(text("监控刷新间隔",16,WHITE,true));addAction(c,"2 秒","CPU 与运行时长刷新频率",()->{log("刷新间隔保持 2 秒");showSettings();});
+        c.addView(text("监控刷新间隔",16,WHITE,true));addAction(c,"0.1 秒","CPU 监控刷新频率（每秒 10 次）",()->{log("CPU 刷新频率为 100ms");showSettings();});
         addAction(c,"重置模块开关","将全部模块接口设为关闭",()->{for(int i=0;i<4;i++)setModule(i,false);showSettings();});
         addAction(c,"清空运行日志","删除本地日志记录",()->{logs.clear();log("日志已清空");showSettings();});
         addCard(root,c,14);
