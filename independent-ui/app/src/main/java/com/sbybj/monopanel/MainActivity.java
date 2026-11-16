@@ -46,12 +46,13 @@ public class MainActivity extends Activity {
     private final String[] descriptions={"独立模块接口 A","独立模块接口 B","独立模块接口 C","独立模块接口 D"};
     private final Runnable monitor=new Runnable(){ public void run(){
         if(runtimeValue!=null){ updateRuntime(); }
-        handler.postDelayed(this,100);
+        handler.postDelayed(this,1000);
     }};
 
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
         startedAt=SystemClock.elapsedRealtime();
+        request120Hz();
         getWindow().setStatusBarColor(BLACK); getWindow().setNavigationBarColor(BLACK);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         log("应用启动"); showHome(); handler.post(monitor); requestRootAccess();
@@ -121,95 +122,144 @@ public class MainActivity extends Activity {
         LinearLayout c=vertical();c.setPadding(dp(16),dp(12),dp(16),dp(12));
         c.setBackground(glassCard().getBackground());return c;
     }
+    private int statusBarHeight(){
+        int id=getResources().getIdentifier("status_bar_height","dimen","android");
+        return id>0?getResources().getDimensionPixelSize(id):dp(24);
+    }
+    private int navBarHeight(){
+        int id=getResources().getIdentifier("navigation_bar_height","dimen","android");
+        return id>0?getResources().getDimensionPixelSize(id):dp(24);
+    }
+    private View glassBackground(){
+        GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{Color.argb(145,72,76,84),Color.argb(118,28,30,36),Color.argb(142,12,13,18)});
+        d.setCornerRadius(dp(28));
+        d.setStroke(dp(1),Color.argb(62,255,255,255));
+        View v=new View(this);v.setBackground(d);return v;
+    }
+    private LinearLayout glassPanel(){
+        LinearLayout p=vertical();
+        p.setPadding(dp(14),dp(10),dp(14),dp(10));
+        p.setBackground(glassBackground().getBackground());
+        return p;
+    }
     private void showHome(){
         FrameLayout frame=new FrameLayout(this);
         ImageView wallpaper=new ImageView(this);
         wallpaper.setImageResource(R.drawable.wallpaper);
         wallpaper.setScaleType(ImageView.ScaleType.CENTER_CROP);
         frame.addView(wallpaper,new FrameLayout.LayoutParams(-1,-1));
-        View shade=new View(this);shade.setBackgroundColor(Color.argb(38,0,0,0));
+        View shade=new View(this);
+        shade.setBackgroundColor(Color.argb(55,0,0,0));
         frame.addView(shade,new FrameLayout.LayoutParams(-1,-1));
 
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(Color.TRANSPARENT);
         LinearLayout page=vertical();
-        page.setPadding(dp(18),dp(12),dp(18),dp(16));
-        FrameLayout.LayoutParams pageParams=new FrameLayout.LayoutParams(-1,-1);
-        frame.addView(page,pageParams);
+        page.setPadding(dp(18),statusBarHeight()+dp(10),dp(18),navBarHeight()+dp(14));
+        scroll.addView(page,new ScrollView.LayoutParams(-1,-1));
+        frame.addView(scroll,new FrameLayout.LayoutParams(-1,-1));
 
         LinearLayout top=horizontal();
-        LinearLayout dateCard=cardContainer();
-        homeTime=text("--:--",48,WHITE,false);
-        homeTime.setGravity(Gravity.CENTER_VERTICAL);
-        homeDate=text("--月--日",17,WHITE,false);
-        dateCard.addView(homeTime,lp(-1,68));dateCard.addView(homeDate,lp(-1,30));
-        LinearLayout cpuCard=cardContainer();
+        LinearLayout date=glassPanel();
+        homeTime=text("--:--",46,WHITE,false);
+        homeDate=text("--月--日 星期一",16,WHITE,false);
+        date.addView(homeTime,lp(-1,62));
+        date.addView(homeDate,lp(-1,28));
+
+        LinearLayout cpu=glassPanel();
         LinearLayout cpuRow=horizontal();
         homeRing=new CpuRingView();
-        cpuRow.addView(homeRing,new LinearLayout.LayoutParams(dp(104),dp(104)));
-        LinearLayout cpuLabels=vertical();cpuLabels.setPadding(dp(10),0,0,0);
-        cpuLabels.addView(text("CPU",17,WHITE,false),lp(-1,30));
+        cpuRow.addView(homeRing,new LinearLayout.LayoutParams(dp(88),dp(88)));
+        LinearLayout cpuInfo=vertical();
+        cpuInfo.setGravity(Gravity.CENTER_VERTICAL);
+        cpuInfo.setPadding(dp(8),0,0,0);
+        cpuInfo.addView(text("CPU",16,WHITE,false),lp(-1,26));
         homeCpuPercent=text("--%",22,WHITE,false);
-        cpuLabels.addView(homeCpuPercent,lp(-1,34));
-        cpuLabels.addView(text("实时占用率",10,Color.LTGRAY,false),lp(-1,24));
-        cpuRow.addView(cpuLabels,new LinearLayout.LayoutParams(0,-1,1));
-        cpuCard.addView(cpuRow,new LinearLayout.LayoutParams(-1,-1));
-        top.addView(dateCard,new LinearLayout.LayoutParams(0,dp(124),1));
-        View gap=new View(this);top.addView(gap,new LinearLayout.LayoutParams(dp(12),1));
-        top.addView(cpuCard,new LinearLayout.LayoutParams(0,dp(124),1));
-        page.addView(top,lp(-1,124));
+        cpuInfo.addView(homeCpuPercent,lp(-1,32));
+        cpuInfo.addView(text("实时占用",11,Color.LTGRAY,false),lp(-1,22));
+        cpuRow.addView(cpuInfo,new LinearLayout.LayoutParams(0,-1,1));
+        cpu.addView(cpuRow,new LinearLayout.LayoutParams(-1,-1));
 
-        LinearLayout rootCard=cardContainer();rootCard.setOrientation(0);
-        TextView shield=text("✓",30,WHITE,true);shield.setGravity(Gravity.CENTER);
-        rootCard.addView(shield,lp(54,-1));
-        LinearLayout rootLabels=vertical();
-        rootLabels.addView(text("Root 权限状态",17,WHITE,true),lp(-1,28));
+        top.addView(date,new LinearLayout.LayoutParams(0,dp(116),1));
+        View topGap=new View(this);top.addView(topGap,new LinearLayout.LayoutParams(dp(12),1));
+        top.addView(cpu,new LinearLayout.LayoutParams(0,dp(116),1));
+        page.addView(top,lp(-1,116));
+
+        LinearLayout rootCard=horizontal();
+        rootCard.setGravity(Gravity.CENTER_VERTICAL);
+        rootCard.setPadding(dp(16),dp(8),dp(16),dp(8));
+        rootCard.setBackground(glassBackground().getBackground());
+        TextView shield=text("✓",30,WHITE,true);
+        shield.setGravity(Gravity.CENTER);
+        rootCard.addView(shield,lp(48,52));
+        LinearLayout rootInfo=vertical();
+        rootInfo.setGravity(Gravity.CENTER_VERTICAL);
+        rootInfo.addView(text("Root 权限状态",17,WHITE,true),lp(-1,26));
         homeRootStatus=text("正在检测授权…",13,Color.LTGRAY,false);
-        rootLabels.addView(homeRootStatus,lp(-1,24));
-        rootCard.addView(rootLabels,new LinearLayout.LayoutParams(0,-2,1));
-        LinearLayout.LayoutParams rootParams=lp(-1,64);rootParams.topMargin=dp(18);page.addView(rootCard,rootParams);
+        rootInfo.addView(homeRootStatus,lp(-1,24));
+        rootCard.addView(rootInfo,new LinearLayout.LayoutParams(0,dp(52),1));
+        LinearLayout.LayoutParams rp=lp(-1,72);rp.topMargin=dp(16);
+        page.addView(rootCard,rp);
 
-        View spacer=new View(this);page.addView(spacer,new LinearLayout.LayoutParams(1,0,1));
+        View spacer=new View(this);
+        page.addView(spacer,new LinearLayout.LayoutParams(1,0,1));
 
         LinearLayout row1=horizontal(),row2=horizontal();
-        addHomeButton(row1,"⊙","透视开关",()->{if(moduleListener!=null)moduleListener.onAction("toggle_overlay");showModules();});
-        addHomeButton(row1,"◉","透视设置",()->{if(moduleListener!=null)moduleListener.onAction("overlay_settings");showSettings();});
+        addHomeButton(row1,"◎","透视开关",()->{
+            if(moduleListener!=null)moduleListener.onAction("toggle_overlay");
+            showModules();
+        });
+        addHomeButton(row1,"◉","透视设置",()->{
+            if(moduleListener!=null)moduleListener.onAction("overlay_settings");
+            showSettings();
+        });
         addHomeButton(row1,"⚙","功能设置",()->showSettings());
         addHomeButton(row2,"▣","实时监控",()->showCpuMonitor());
         addHomeButton(row2,"▦","更多功能",()->showModules());
         addHomeButton(row2,"⏻","退出应用",()->finish());
-        page.addView(row1,lp(-1,132)); 
-        page.addView(row2,lp(-1,132));
-        LinearLayout.LayoutParams rowGap=lp(-1,dp(12));page.addView(new View(this),rowGap);
+        page.addView(row1,lp(-1,116));
+        LinearLayout.LayoutParams r2=lp(-1,116);r2.topMargin=dp(12);
+        page.addView(row2,r2);
 
-        LinearLayout footer=horizontal();footer.setGravity(Gravity.CENTER);
-        footer.setPadding(dp(18),0,dp(18),0);footer.setBackground(glassCard().getBackground());
+        LinearLayout footer=horizontal();
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        footer.setPadding(dp(16),0,dp(16),0);
+        footer.setBackground(glassBackground().getBackground());
         TextView version=text("ⓘ  MonoPanel v1.0",14,WHITE,false);
-        footer.addView(version,new LinearLayout.LayoutParams(0,dp(54),1));
-        TextView divider=text("|",18,Color.LTGRAY,false);footer.addView(divider,lp(24,54));
+        footer.addView(version,new LinearLayout.LayoutParams(0,dp(52),1));
+        footer.addView(text("|",18,Color.LTGRAY,false),lp(20,52));
         TextView status=text("●  稳定运行中…",14,WHITE,false);
-        footer.addView(status,new LinearLayout.LayoutParams(0,dp(54),1));
-        LinearLayout.LayoutParams footerP=lp(-1,54);footerP.topMargin=dp(18);page.addView(footer,footerP);
+        footer.addView(status,new LinearLayout.LayoutParams(0,dp(52),1));
+        LinearLayout.LayoutParams fp=lp(-1,56);fp.topMargin=dp(18);
+        page.addView(footer,fp);
 
         setContentView(frame);
-        handler.removeCallbacks(homeClock); homeClock.run();
-        if(homeCpuPercent!=null&&!cpuSamples.isEmpty()){
-            int v=cpuSamples.get(cpuSamples.size()-1);
-            homeCpuPercent.setText(v+"%");homeRing.setPercent(v);
+        handler.removeCallbacks(homeClock);
+        homeClock.run();
+        if(!cpuSamples.isEmpty()){
+            int value=cpuSamples.get(cpuSamples.size()-1);
+            homeCpuPercent.setText(value+"%");
+            homeRing.setPercent(value);
         }
-        String rs=RootInfoReader.getLastStatus();
-        if(homeRootStatus!=null)homeRootStatus.setText(rs==null||rs.isEmpty()?"等待 Root 授权":rs);
+        String last=RootInfoReader.getLastStatus();
+        homeRootStatus.setText(last==null||last.isEmpty()?"等待 Root 授权":last);
     }
     private void addHomeButton(LinearLayout row,String icon,String label,Runnable action){
-        LinearLayout button=vertical();button.setGravity(Gravity.CENTER);
-        button.setBackground(glassCard().getBackground());
-        TextView glyph=text(icon,34,WHITE,true);glyph.setGravity(Gravity.CENTER);
+        LinearLayout button=vertical();
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(glassBackground().getBackground());
+        TextView glyph=text(icon,31,WHITE,true);glyph.setGravity(Gravity.CENTER);
         TextView caption=text(label,15,WHITE,false);caption.setGravity(Gravity.CENTER);
-        button.addView(glyph,new LinearLayout.LayoutParams(-1,dp(58)));
-        button.addView(caption,new LinearLayout.LayoutParams(-1,dp(34)));
+        button.addView(glyph,new LinearLayout.LayoutParams(-1,dp(54)));
+        button.addView(caption,new LinearLayout.LayoutParams(-1,dp(32)));
         button.setOnClickListener(v->action.run());
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(132),1);
-        p.setMargins(dp(0),0,dp(0),0);
-        row.addView(button,p);
-        if(row.getChildCount()<3){View gap=new View(this);row.addView(gap,new LinearLayout.LayoutParams(dp(14),1));}
+        row.addView(button,new LinearLayout.LayoutParams(0,-1,1));
+        if(row.getChildCount()<5){
+            row.addView(new View(this),new LinearLayout.LayoutParams(dp(10),1));
+        }
     }
     private class CpuRingView extends View {
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -217,12 +267,41 @@ public class MainActivity extends Activity {
         CpuRingView(){super(MainActivity.this);}
         void setPercent(int p){percent=Math.max(0,Math.min(100,p));invalidate();}
         @Override protected void onDraw(Canvas c){
-            float cx=getWidth()/2f,cy=getHeight()/2f,r=Math.min(cx,cy)-dp(9);
-            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(10));paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setColor(Color.argb(95,220,220,220));c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,360,false,paint);
-            paint.setColor(WHITE);c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,percent*3.6f,false,paint);
-            paint.setStyle(Paint.Style.FILL);paint.setColor(WHITE);paint.setTextSize(dp(18));paint.setTextAlign(Paint.Align.CENTER);
+            float cx=getWidth()/2f,cy=getHeight()/2f,r=Math.min(cx,cy)-dp(8);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(9));
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setColor(Color.argb(95,220,220,220));
+            c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,360,false,paint);
+            paint.setColor(WHITE);
+            c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,percent*3.6f,false,paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(WHITE);
+            paint.setTextSize(dp(17));
+            paint.setTextAlign(Paint.Align.CENTER);
             c.drawText(percent+"%",cx,cy+dp(6),paint);
+        }
+    }
+
+    private void request120Hz(){
+        if(Build.VERSION.SDK_INT>=23){
+            try{
+                android.view.Display display=getWindowManager().getDefaultDisplay();
+                android.view.Display.Mode best=null;
+                for(android.view.Display.Mode mode:display.getSupportedModes()){
+                    if(mode.getRefreshRate()>=119.0f &&
+                       (best==null || mode.getRefreshRate()>best.getRefreshRate())) best=mode;
+                }
+                if(best!=null){
+                    android.view.WindowManager.LayoutParams attrs=getWindow().getAttributes();
+                    attrs.preferredDisplayModeId=best.getModeId();
+                    getWindow().setAttributes(attrs);
+                }
+            }catch(Exception ignored){}
+        }
+        if(Build.VERSION.SDK_INT>=30){
+            try{getWindow().getDecorView().setFrameRate(120f,android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);}
+            catch(Exception ignored){}
         }
     }
 
