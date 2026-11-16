@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
     private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));}
     private void initPage(String title){
         FrameLayout frame=new FrameLayout(this);
-        frame.setBackgroundResource(R.drawable.wallpaper);
+        frame.setBackground(wallpaperBackground());
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true);
         scroll.setBackgroundColor(Color.TRANSPARENT);
         root=vertical(); root.setPadding(dp(18),dp(18),dp(18),dp(24)); scroll.addView(root);
@@ -111,6 +111,10 @@ public class MainActivity extends Activity {
         }
         handler.postDelayed(this,1000);
     }};
+    private GradientDrawable wallpaperBackground(){
+        return new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(10,12,18),Color.rgb(31,35,45),Color.rgb(5,6,10)});
+    }
     private View glassCard(){
         android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable(
             android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
@@ -148,9 +152,8 @@ public class MainActivity extends Activity {
     private TextView homeGpuValue, homeRamValue, homeFpsValue, homeBatteryValue;
     private void showHome(){
         FrameLayout frame=new FrameLayout(this);
-        ImageView wallpaper=new ImageView(this);
-        wallpaper.setImageResource(R.drawable.wallpaper);
-        wallpaper.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        View wallpaper=new View(this);
+        wallpaper.setBackground(wallpaperBackground());
         frame.addView(wallpaper,new FrameLayout.LayoutParams(-1,-1));
         View shade=new View(this);
         shade.setBackgroundColor(Color.argb(82,0,0,0));
