@@ -101,7 +101,7 @@ public class MainActivity extends Activity {
         logo.setBackground(shape(Color.argb(185,38,43,58),22));header.addView(logo,lp(66,66));
         LinearLayout titles=vertical();titles.setPadding(dp(14),0,0,0);
         titles.addView(text("MonoPanel",25,WHITE,true));
-        titles.addView(text("极简 · 专注 · 专业",13,Color.rgb(210,214,225),false));
+        runtimeValue=text("运行时长 00:00:00",13,Color.rgb(210,214,225),false);titles.addView(runtimeValue);
         header.addView(titles,new LinearLayout.LayoutParams(0,-2,1));
         TextView gear=text("⚙",25,WHITE,false);gear.setGravity(Gravity.CENTER);
         gear.setBackground(shape(Color.argb(145,68,73,89),28));header.addView(gear,lp(48,48));
