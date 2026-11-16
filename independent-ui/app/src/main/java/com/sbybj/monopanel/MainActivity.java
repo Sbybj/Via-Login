@@ -46,6 +46,7 @@ public class MainActivity extends Activity {
     private final String[] descriptions={"独立模块接口 A","独立模块接口 B","独立模块接口 C","独立模块接口 D"};
     private final Runnable monitor=new Runnable(){ public void run(){
         if(runtimeValue!=null){ updateRuntime(); }
+        updateSystemMetrics();
         handler.postDelayed(this,1000);
     }};
 
@@ -179,8 +180,9 @@ public class MainActivity extends Activity {
         page.addView(header,lp(-1,66));
 
         LinearLayout cpu=metricCard("CPU","--%","实时占用 · Root 采样",true);
-        LinearLayout gpu=metricCard("GPU","--%","系统接口待接入",false);
-        LinearLayout ram=metricCard("RAM","--%","内存信息待接入",false);
+        LinearLayout gpu=metricCard("GPU","接口待接入","GPU 驱动数据接口",false);
+        LinearLayout ram=metricCard("RAM","读取中","系统可用内存",false);
+        homeRamValue=(TextView)ram.getChildAt(1);
         homeCpuPercent=text("--%",29,WHITE,true);
         cpu.removeAllViews();
         cpu.addView(text("CPU",15,WHITE,true),lp(-1,24));
@@ -197,8 +199,9 @@ public class MainActivity extends Activity {
         addCard(page,ram,12);
 
         LinearLayout smallRow=horizontal();
-        LinearLayout fps=metricCard("FPS","--","等待游戏帧率接口",false);
-        LinearLayout battery=metricCard("电池","--","系统电池信息",false);
+        LinearLayout fps=metricCard("FPS","接口待接入","游戏帧率数据接口",false);
+        LinearLayout battery=metricCard("电池","读取中","系统电池状态",false);
+        homeBatteryValue=(TextView)battery.getChildAt(1);
         smallRow.addView(fps,new LinearLayout.LayoutParams(0,dp(100),1));
         View gap=new View(this);smallRow.addView(gap,lp(10,1));
         smallRow.addView(battery,new LinearLayout.LayoutParams(0,dp(100),1));
@@ -262,6 +265,28 @@ public class MainActivity extends Activity {
             int value=cpuSamples.get(cpuSamples.size()-1);
             homeCpuPercent.setText(value+"%");
             homeRing.setPercent(value);
+        }
+    }
+
+    private void updateSystemMetrics(){
+        if(homeRamValue!=null){
+            try{
+                ActivityManager.MemoryInfo info=new ActivityManager.MemoryInfo();
+                ((ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(info);
+                long mb=info.availMem/(1024L*1024L);
+                homeRamValue.setText(String.format(Locale.getDefault(),"可用 %d MB",mb));
+            }catch(Exception ignored){}
+        }
+        if(homeBatteryValue!=null){
+            try{
+                android.content.Intent battery=registerReceiver(null,new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED));
+                if(battery!=null){
+                    int level=battery.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL,-1);
+                    int scale=battery.getIntExtra(android.os.BatteryManager.EXTRA_SCALE,100);
+                    int percent=scale>0?Math.round(level*100f/scale):0;
+                    homeBatteryValue.setText(percent+"%");
+                }
+            }catch(Exception ignored){}
         }
     }
 
