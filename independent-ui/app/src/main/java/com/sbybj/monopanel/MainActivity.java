@@ -31,7 +31,7 @@ public class MainActivity extends Activity {
     private final int BLACK=Color.rgb(4,4,4), WHITE=Color.rgb(245,245,245), MUTED=Color.rgb(150,150,150);
     private final Handler handler=new Handler(Looper.getMainLooper());
     private LinearLayout root;
-    private TextView cpuValue, cpuDetail, runtimeValue, statusValue;
+    private TextView cpuValue, cpuDetail, runtimeValue, statusValue, rootStatus;
     private long startedAt, previousTotal=-1, previousIdle=-1;
     private final ArrayList<String> logs=new ArrayList<>();
     private final String[] ids={"module_1","module_2","module_3","module_4"};
@@ -47,7 +47,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         startedAt=SystemClock.elapsedRealtime();
         getWindow().setStatusBarColor(BLACK); getWindow().setNavigationBarColor(BLACK);
-        log("应用启动"); showHome(); handler.post(monitor);
+        log("应用启动"); showHome(); handler.post(monitor); requestRootAccess();
     }
     @Override protected void onDestroy(){ handler.removeCallbacks(monitor); super.onDestroy(); }
 
@@ -103,6 +103,12 @@ public class MainActivity extends Activity {
         LinearLayout rt=vertical();rt.addView(text("本次运行时长",13,MUTED,false));runtimeValue=text("00:00:00",23,WHITE,true);rt.addView(runtimeValue);
         stats.addView(rt,new LinearLayout.LayoutParams(0,-2,1));status.addView(stats);
         addCard(root,status,14);
+
+        LinearLayout rootCard=horizontal(); rootCard.setPadding(dp(16),dp(10),dp(16),dp(10));
+        rootStatus=text("Root 权限：检测中…",13,WHITE,true); rootCard.addView(rootStatus,new LinearLayout.LayoutParams(0,dp(38),1));
+        TextView refreshRoot=text("检测 / 授权",12,WHITE,true); refreshRoot.setGravity(Gravity.CENTER); refreshRoot.setPadding(dp(10),0,dp(10),0); refreshRoot.setBackground(shape(Color.rgb(55,55,55),18)); rootCard.addView(refreshRoot,lp(-2,32));
+        refreshRoot.setOnClickListener(v->requestRootAccess());
+        addCard(root,rootCard,10);
 
         LinearLayout feature=vertical();feature.setPadding(dp(16),dp(12),dp(16),dp(12));
         LinearLayout fh=horizontal();fh.addView(text("模块接口",19,WHITE,true),new LinearLayout.LayoutParams(0,dp(42),1));
@@ -195,8 +201,22 @@ public class MainActivity extends Activity {
         c.addView(infoLine("品牌",Build.BRAND));c.addView(infoLine("制造商",Build.MANUFACTURER));c.addView(infoLine("型号",Build.MODEL));
         c.addView(infoLine("设备代号",Build.DEVICE));c.addView(infoLine("产品",Build.PRODUCT));c.addView(infoLine("Android",Build.VERSION.RELEASE));
         c.addView(infoLine("SDK",String.valueOf(Build.VERSION.SDK_INT)));c.addView(infoLine("CPU ABI",Build.SUPPORTED_ABIS[0]));
+        c.addView(infoLine("Root 状态", RootInfoReader.getLastStatus()));
+        c.addView(infoLine("Root 系统信息", RootInfoReader.getLastDetails()));
+        addAction(c,"重新检测 Root","由系统 Root 管理器决定是否授权",()->requestRootAccess());
         addCard(root,c,14);
     }
+
+    private void requestRootAccess(){
+        if(rootStatus!=null) rootStatus.setText("Root 权限：等待系统授权…");
+        RootInfoReader.read(this,(granted,details)->{
+            String status=granted?"Root 权限：已授权":"Root 权限：未授权 / 不可用";
+            RootInfoReader.setLastResult(status,details);
+            if(rootStatus!=null) rootStatus.setText(status+" · "+details);
+            log(granted?"Root 授权成功":"Root 未授权或读取失败");
+        });
+    }
+
     private void showLogs(){
         initPage("运行日志");LinearLayout c=vertical();c.setPadding(dp(16),dp(12),dp(16),dp(12));
         if(logs.isEmpty())c.addView(text("暂无日志",14,MUTED,false));
