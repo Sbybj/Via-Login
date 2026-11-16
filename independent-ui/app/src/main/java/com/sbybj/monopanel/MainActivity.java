@@ -61,9 +61,11 @@ public class MainActivity extends Activity {
         GradientDrawable d=new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d;
     }
     private GradientDrawable cardBg(){
+        // Translucent glass surface: deliberately no bright outline or edge glow.
         GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.argb(164,72,78,94),Color.argb(142,22,25,35)});
-        d.setCornerRadius(dp(24)); return d;
+                new int[]{Color.argb(92,116,124,142),Color.argb(66,35,40,54),Color.argb(78,18,21,31)});
+        d.setCornerRadius(dp(24));
+        return d;
     }
     private TextView text(String s,int size,int color,boolean bold){
         TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(color);
@@ -98,13 +100,13 @@ public class MainActivity extends Activity {
         initPage("MonoPanel");
         LinearLayout header=horizontal(); header.setPadding(dp(10),dp(4),dp(8),dp(8));
         TextView logo=text("M",40,WHITE,true);logo.setGravity(Gravity.CENTER);
-        logo.setBackground(shape(Color.argb(185,38,43,58),22));header.addView(logo,lp(66,66));
+        logo.setBackground(shape(Color.argb(105,72,78,94),22));header.addView(logo,lp(66,66));
         LinearLayout titles=vertical();titles.setPadding(dp(14),0,0,0);
         titles.addView(text("MonoPanel",25,WHITE,true));
         runtimeValue=text("运行时长 00:00:00",13,Color.rgb(210,214,225),false);titles.addView(runtimeValue);
         header.addView(titles,new LinearLayout.LayoutParams(0,-2,1));
         TextView gear=text("⚙",25,WHITE,false);gear.setGravity(Gravity.CENTER);
-        gear.setBackground(shape(Color.argb(145,68,73,89),28));header.addView(gear,lp(48,48));
+        gear.setBackground(shape(Color.argb(88,68,73,89),28));header.addView(gear,lp(48,48));
         gear.setOnClickListener(v->{log("打开设置");showSettings();});
         root.addView(header,lp(-1,78));
 
@@ -129,7 +131,7 @@ public class MainActivity extends Activity {
         LinearLayout feature=vertical();feature.setPadding(dp(14),dp(10),dp(14),dp(10));
         LinearLayout fh=horizontal();fh.addView(text("模块接口",18,WHITE,true),new LinearLayout.LayoutParams(0,dp(34),1));
         TextView all=text("全部关闭",12,WHITE,true);all.setGravity(Gravity.CENTER);
-        all.setBackground(shape(Color.argb(100,115,122,140),18));all.setPadding(dp(10),0,dp(10),0);fh.addView(all,lp(76,30));
+        all.setBackground(shape(Color.argb(72,115,122,140),18));all.setPadding(dp(10),0,dp(10),0);fh.addView(all,lp(76,30));
         all.setOnClickListener(v->{for(int i=0;i<4;i++)setModule(i,false);});
         feature.addView(fh);
         for(int i=0;i<4;i++)addModuleRow(feature,i);
