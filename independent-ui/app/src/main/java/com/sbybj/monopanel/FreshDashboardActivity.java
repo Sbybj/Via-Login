@@ -31,6 +31,8 @@ public class FreshDashboardActivity extends Activity {
     private LinearLayout homePage;
     private TextView[] navLabels;
     private TextView monitorCpu, monitorRam, monitorBattery, monitorRoot;
+    private TextView gpuStatusValue, refreshRateStatusValue;
+    private boolean rootCheckStarted = false;
     private int activeTab = 0;
     private int refreshIntervalMs = 500;
     private long previousIdle, previousTotal;
@@ -134,9 +136,9 @@ public class FreshDashboardActivity extends Activity {
         sp.topMargin = dp(12);
         content.addView(stats, sp);
         stats.addView(label("运行状态", 15, white, true));
-        addStat(stats, "图形处理器 GPU", "等待接入");
+        gpuStatusValue = addLiveStat(stats, "GPU 型号", readGpuModel());
         addDivider(stats);
-        addStat(stats, "画面帧率 FPS", "等待接入");
+        refreshRateStatusValue = addLiveStat(stats, "屏幕刷新率", readScreenRefreshRate());
         addDivider(stats);
         LinearLayout rootRow = row();
         rootRow.setPadding(0, dp(13), 0, dp(13));
@@ -466,9 +468,10 @@ public class FreshDashboardActivity extends Activity {
                 if (monitorBattery != null) monitorBattery.setText(batteryValue.getText());
             }
         } catch (Exception ignored) {}
-        boolean suFound = new java.io.File("/system/bin/su").exists() || new java.io.File("/system/xbin/su").exists() || new java.io.File("/sbin/su").exists();
-        if (rootValue != null && !suFound) rootValue.setText("未检测到 su 文件");
-        if (monitorRoot != null) monitorRoot.setText(rootValue == null ? "检测中" : rootValue.getText());
+        if (gpuStatusValue != null) gpuStatusValue.setText(readGpuModel());
+        if (refreshRateStatusValue != null) refreshRateStatusValue.setText(readScreenRefreshRate());
+        if (monitorRoot != null) monitorRoot.setText(rootValue == null ? "正在验证授权" : rootValue.getText());
+        verifyRootAuthorization();
     }
 
     private void requestHighRefreshRate() {
@@ -516,6 +519,63 @@ public class FreshDashboardActivity extends Activity {
         long idle = Long.parseLong(p[4]);
         if (p.length > 5) idle += Long.parseLong(p[5]);
         return new long[]{total, idle};
+    }
+
+
+    private TextView addLiveStat(LinearLayout parent, String name, String value) {
+        LinearLayout r = row();
+        r.setPadding(0, dp(13), 0, dp(13));
+        r.addView(label(name, 12, muted, false), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView v = label(displayOrUnavailable(value), 11, white, true);
+        r.addView(v);
+        parent.addView(r);
+        return v;
+    }
+
+    private String readGpuModel() {
+        String[] paths = {
+            "/sys/class/kgsl/kgsl-3d0/gpu_model",
+            "/sys/class/kgsl/kgsl-3d0/gpu_name",
+            "/sys/devices/platform/soc/3d00000.gpu/gpu_model",
+            "/sys/kernel/gpu/gpu_model"
+        };
+        for (String path : paths) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
+                String value = reader.readLine();
+                if (value != null && !value.trim().isEmpty()) return value.trim();
+            } catch (Exception ignored) {}
+        }
+        return "GPU 型号读取受系统限制";
+    }
+
+    private void verifyRootAuthorization() {
+        if (rootCheckStarted) return;
+        rootCheckStarted = true;
+        new Thread(() -> {
+            String result = "Root 授权失败";
+            Process process = null;
+            try {
+                process = new ProcessBuilder("su", "-c", "id")
+                    .redirectErrorStream(true).start();
+                StringBuilder output = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new java.io.InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) output.append(line);
+                }
+                int code = process.waitFor();
+                result = code == 0 && output.toString().contains("uid=0")
+                    ? "Root 授权正常" : "Root 未获授权";
+            } catch (Exception e) {
+                result = "Root 检测失败";
+                android.util.Log.e("MonoPanel-ROOT", "Root authorization check failed", e);
+            }
+            final String status = result;
+            handler.post(() -> {
+                if (rootValue != null) rootValue.setText(status);
+                if (monitorRoot != null) monitorRoot.setText(status);
+            });
+        }, "MonoPanel-RootCheck").start();
     }
 
     private void addStat(LinearLayout parent, String name, String value) {
