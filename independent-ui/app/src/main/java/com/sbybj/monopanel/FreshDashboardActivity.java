@@ -30,6 +30,7 @@ public class FreshDashboardActivity extends Activity {
     private ScrollView mainScroll;
     private LinearLayout homePage;
     private TextView[] navLabels;
+    private TextView monitorCpu, monitorRam, monitorBattery, monitorRoot;
     private int activeTab = 0;
     private int refreshIntervalMs = 500;
     private long previousIdle, previousTotal;
@@ -216,19 +217,19 @@ public class FreshDashboardActivity extends Activity {
         LinearLayout c = card(); c.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams cp = matchWrap(); cp.topMargin = dp(22); p.addView(c, cp);
         c.addView(label("CPU 使用率", 13, muted, true));
-        TextView cpu = label(cpuValue == null ? "--%" : cpuValue.getText().toString(), 38, white, true);
-        cpu.setPadding(0, dp(10), 0, dp(5)); c.addView(cpu);
+        monitorCpu = label(cpuValue == null ? "--%" : cpuValue.getText().toString(), 38, white, true);
+        monitorCpu.setPadding(0, dp(10), 0, dp(5)); c.addView(monitorCpu);
         c.addView(label("系统总内存使用量", 13, muted, true));
-        TextView ram = label(ramValue == null ? "--" : ramValue.getText().toString(), 28, white, true);
-        ram.setPadding(0, dp(8), 0, dp(15)); c.addView(ram);
+        monitorRam = label(ramValue == null ? "--" : ramValue.getText().toString(), 28, white, true);
+        monitorRam.setPadding(0, dp(8), 0, dp(15)); c.addView(monitorRam);
         c.addView(label("电池电量", 13, muted, true));
-        TextView bat = label(batteryValue == null ? "--" : batteryValue.getText().toString(), 28, white, true);
-        bat.setPadding(0, dp(8), 0, dp(15)); c.addView(bat);
+        monitorBattery = label(batteryValue == null ? "--" : batteryValue.getText().toString(), 28, white, true);
+        monitorBattery.setPadding(0, dp(8), 0, dp(15)); c.addView(monitorBattery);
         addDivider(c);
         addStat(c, "GPU 负载", "未接入传感器");
         addDivider(c); addStat(c, "实时 FPS", "未接入帧率源");
         addDivider(c); addStat(c, "屏幕刷新率", "请求 120Hz（系统可能限制）");
-        addDivider(c); addStat(c, "Root 状态", rootValue == null ? "检测中" : rootValue.getText().toString());
+        addDivider(c); monitorRoot = label(rootValue == null ? "检测中" : rootValue.getText().toString(), 11, white, true);\n        LinearLayout rr = row(); rr.setPadding(0, dp(13), 0, dp(13)); rr.addView(label("Root 状态", 12, muted, false), new LinearLayout.LayoutParams(0, -2, 1)); rr.addView(monitorRoot); c.addView(rr);
         TextView note = label("说明：未接入的数据不会用模拟数值填充。", 10, muted, false);
         note.setPadding(0, dp(16), 0, 0); p.addView(note);
         return p;
@@ -298,6 +299,7 @@ public class FreshDashboardActivity extends Activity {
                 if (total > 0) {
                     int usage = (int)Math.max(0, Math.min(100, 100f * (total - idle) / total));
                     cpuValue.setText(String.format(Locale.US, "%d%%", usage));
+                    if (monitorCpu != null) monitorCpu.setText(cpuValue.getText());
                     cpuBar.setProgress(usage);
                 }
             }
@@ -308,16 +310,19 @@ public class FreshDashboardActivity extends Activity {
             ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(info);
             long used = info.totalMem - info.availMem;
             ramValue.setText(String.format(Locale.US, "%.1fG", used / 1073741824.0));
+            if (monitorRam != null) monitorRam.setText(ramValue.getText());
         } catch (Exception ignored) {}
         try {
             android.content.Intent b = registerReceiver(null, new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED));
             if (b != null) {
                 int level = b.getIntExtra("level", 0), scale = b.getIntExtra("scale", 100);
                 batteryValue.setText((level * 100 / Math.max(1, scale)) + "%");
+                if (monitorBattery != null) monitorBattery.setText(batteryValue.getText());
             }
         } catch (Exception ignored) {}
         boolean suFound = new java.io.File("/system/bin/su").exists() || new java.io.File("/system/xbin/su").exists() || new java.io.File("/sbin/su").exists();
-        if (rootValue != null) rootValue.setText(suFound ? "检测到 su" : "未检测到 su");
+        if (rootValue != null) rootValue.setText(suFound ? "检测到 su 文件" : "未检测到 su 文件");
+        if (monitorRoot != null) monitorRoot.setText(rootValue == null ? "检测中" : rootValue.getText());
     }
 
     private void requestHighRefreshRate() {
