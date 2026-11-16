@@ -18,7 +18,36 @@ public final class RootInfoReader {
     public static String getLastDetails(){ return lastDetails; }
     public static void setLastResult(String status,String details){ lastStatus=status; lastDetails=details; }
 
-    public static void read(Activity activity, Callback callback){
+
+    /** Reads aggregate CPU counters through su. Values are total ticks and idle ticks. */
+    public static void readCpuStat(Activity activity, CpuCallback callback){
+        new Thread(() -> {
+            boolean granted=false;
+            long[] counters=null;
+            Process process=null;
+            try {
+                process=new ProcessBuilder("su","-c","cat /proc/stat").redirectErrorStream(true).start();
+                if(process.waitFor(5,TimeUnit.SECONDS)){
+                    BufferedReader reader=new BufferedReader(new InputStreamReader(process.getInputStream()));
+                    String line=reader.readLine();
+                    if(line!=null && line.startsWith("cpu ")){
+                        String[] fields=line.trim().split("\\\\s+");
+                        long total=0;
+                        for(int i=1;i<fields.length;i++) total+=Long.parseLong(fields[i]);
+                        long idle=Long.parseLong(fields[4])+(fields.length>5?Long.parseLong(fields[5]):0);
+                        counters=new long[]{total,idle};
+                        granted=true;
+                    }
+                } else process.destroyForcibly();
+            } catch(Exception ignored) {
+            } finally { if(process!=null)process.destroy(); }
+            final boolean ok=granted;
+            final long[] result=counters;
+            new Handler(Looper.getMainLooper()).post(() -> callback.onResult(ok,result));
+        }).start();
+    }
+    public interface CpuCallback { void onResult(boolean granted,long[] counters); }
+\n    public static void read(Activity activity, Callback callback){
         new Thread(() -> {
             boolean granted=false;
             String details="未取得系统信息";
