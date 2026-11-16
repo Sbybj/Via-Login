@@ -305,7 +305,10 @@ public class FreshDashboardActivity extends Activity {
                 }
             }
             if (now != null) { previousTotal = now[0]; previousIdle = now[1]; }
-        } catch (Exception ignored) {}
+        } catch (Exception cpuError) {
+            if (cpuValue != null) cpuValue.setText("读取失败");
+            if (monitorCpu != null) monitorCpu.setText("读取失败");
+        }
         try {
             android.app.ActivityManager.MemoryInfo info = new android.app.ActivityManager.MemoryInfo();
             ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(info);
@@ -344,12 +347,20 @@ public class FreshDashboardActivity extends Activity {
     }
 
     private long[] readCpu() throws Exception {
-        BufferedReader r = new BufferedReader(new FileReader("/proc/stat"));
-        String line = r.readLine(); r.close();
-        if (line == null || !line.startsWith("cpu ")) return null;
+        // Linux aggregate CPU counters: user, nice, system, idle, iowait,
+        // irq, softirq, steal. Exclude guest/guest_nice because Linux already
+        // includes them in user/nice; counting them again distorts the total.
+        java.io.RandomAccessFile file = new java.io.RandomAccessFile("/proc/stat", "r");
+        String line;
+        try { line = file.readLine(); } finally { file.close(); }
+        if (line == null || !line.startsWith("cpu ")) throw new java.io.IOException("Missing aggregate CPU counters");
         String[] p = line.trim().split("\\s+");
-        long total = 0; for (int i = 1; i < p.length; i++) total += Long.parseLong(p[i]);
-        long idle = Long.parseLong(p[4]) + (p.length > 5 ? Long.parseLong(p[5]) : 0);
+        if (p.length < 5) throw new java.io.IOException("Incomplete CPU counters");
+        long total = 0;
+        int count = Math.min(p.length - 1, 8);
+        for (int i = 1; i <= count; i++) total += Long.parseLong(p[i]);
+        long idle = Long.parseLong(p[4]);
+        if (p.length > 5) idle += Long.parseLong(p[5]); // idle + iowait
         return new long[]{total, idle};
     }
 
