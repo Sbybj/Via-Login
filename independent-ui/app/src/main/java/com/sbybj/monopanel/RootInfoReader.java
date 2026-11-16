@@ -31,7 +31,7 @@ public final class RootInfoReader {
                     BufferedReader reader=new BufferedReader(new InputStreamReader(process.getInputStream()));
                     String line=reader.readLine();
                     if(line!=null && line.startsWith("cpu ")){
-                        String[] fields=line.trim().split("\\\\s+");
+                        String[] fields=line.trim().split("\\s+");
                         long total=0;
                         for(int i=1;i<fields.length;i++) total+=Long.parseLong(fields[i]);
                         long idle=Long.parseLong(fields[4])+(fields.length>5?Long.parseLong(fields[5]):0);
