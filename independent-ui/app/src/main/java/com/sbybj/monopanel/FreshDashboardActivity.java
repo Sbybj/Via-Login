@@ -25,12 +25,13 @@ public class FreshDashboardActivity extends Activity {
     private final int muted = Color.rgb(135, 141, 151);
     private final int white = Color.rgb(242, 244, 247);
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private TextView cpuValue, ramValue, batteryValue, fpsValue, clockValue;
+    private TextView cpuValue, ramValue, batteryValue, rootValue;
+    private android.widget.ProgressBar cpuBar;
     private long previousIdle, previousTotal;
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
             refreshMetrics();
-            handler.postDelayed(this, 1000);
+            handler.postDelayed(this, 500);
         }
     };
 
@@ -38,7 +39,8 @@ public class FreshDashboardActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR & 0);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        requestHighRefreshRate();
         buildScreen();
         refreshMetrics();
     }
@@ -84,16 +86,18 @@ public class FreshDashboardActivity extends Activity {
         LinearLayout heroHead = row();
         hero.addView(heroHead);
         heroHead.addView(label("设备性能", 15, white, true), new LinearLayout.LayoutParams(0, -2, 1));
-        heroHead.addView(label("刷新间隔  1.0s", 10, muted, false));
+        heroHead.addView(label("刷新间隔  0.5s", 10, muted, false));
         cpuValue = label("--%", 48, white, true);
         cpuValue.setPadding(0, dp(18), 0, 0);
         hero.addView(cpuValue);
         hero.addView(label("CPU 使用率", 11, muted, false));
-        View barBack = new View(this);
-        barBack.setBackground(round(Color.rgb(42, 45, 52), 20));
+        cpuBar = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        cpuBar.setMax(100);
+        cpuBar.setProgressTintList(android.content.res.ColorStateList.valueOf(white));
+        cpuBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(42, 45, 52)));
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(5));
         bp.topMargin = dp(18);
-        hero.addView(barBack, bp);
+        hero.addView(cpuBar, bp);
 
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.HORIZONTAL);
@@ -121,7 +125,12 @@ public class FreshDashboardActivity extends Activity {
         addDivider(stats);
         addStat(stats, "画面帧率 FPS", "等待接入");
         addDivider(stats);
-        addStat(stats, "Root 环境", "待检测");
+        LinearLayout rootRow = row();
+        rootRow.setPadding(0, dp(13), 0, dp(13));
+        rootRow.addView(label("Root 环境", 12, muted, false), new LinearLayout.LayoutParams(0, -2, 1));
+        rootValue = label("检测中", 11, white, true);
+        rootRow.addView(rootValue);
+        stats.addView(rootRow);
 
         TextView featureTitle = label("快捷功能", 15, white, true);
         featureTitle.setPadding(0, dp(24), 0, dp(10));
@@ -180,7 +189,11 @@ public class FreshDashboardActivity extends Activity {
             if (now != null && previousTotal > 0) {
                 long total = now[0] - previousTotal;
                 long idle = now[1] - previousIdle;
-                if (total > 0) cpuValue.setText(String.format(Locale.US, "%.0f%%", 100f * (total - idle) / total));
+                if (total > 0) {
+                    int usage = (int)Math.max(0, Math.min(100, 100f * (total - idle) / total));
+                    cpuValue.setText(String.format(Locale.US, "%d%%", usage));
+                    cpuBar.setProgress(usage);
+                }
             }
             if (now != null) { previousTotal = now[0]; previousIdle = now[1]; }
         } catch (Exception ignored) {}
@@ -197,6 +210,21 @@ public class FreshDashboardActivity extends Activity {
                 batteryValue.setText((level * 100 / Math.max(1, scale)) + "%");
             }
         } catch (Exception ignored) {}
+        boolean suFound = new java.io.File("/system/bin/su").exists() || new java.io.File("/system/xbin/su").exists() || new java.io.File("/sbin/su").exists();
+        if (rootValue != null) rootValue.setText(suFound ? "检测到 su" : "未检测到 su");
+    }
+
+    private void requestHighRefreshRate() {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            try {
+                android.view.Display display = getWindowManager().getDefaultDisplay();
+                android.view.Display.Mode best = null;
+                for (android.view.Display.Mode mode : display.getSupportedModes()) {
+                    if (mode.getRefreshRate() >= 119f && (best == null || mode.getRefreshRate() > best.getRefreshRate())) best = mode;
+                }
+                if (best != null) getWindow().setPreferredDisplayModeId(best.getModeId());
+            } catch (Exception ignored) {}
+        }
     }
 
     private long[] readCpu() throws Exception {
