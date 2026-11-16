@@ -15,6 +15,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -52,6 +53,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         startedAt=SystemClock.elapsedRealtime();
         getWindow().setStatusBarColor(BLACK); getWindow().setNavigationBarColor(BLACK);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         log("应用启动"); showHome(); handler.post(monitor); requestRootAccess();
     }
     @Override protected void onDestroy(){ handler.removeCallbacks(monitor); RootInfoReader.stopCpuMonitor(); super.onDestroy(); }
@@ -97,73 +99,50 @@ public class MainActivity extends Activity {
     }
 
     private void showHome(){
-        initPage("MonoPanel");
-        LinearLayout header=horizontal(); header.setPadding(dp(10),dp(4),dp(8),dp(8));
-        TextView logo=text("M",40,WHITE,true);logo.setGravity(Gravity.CENTER);
-        logo.setBackground(shape(Color.argb(105,72,78,94),22));header.addView(logo,lp(66,66));
-        LinearLayout titles=vertical();titles.setPadding(dp(14),0,0,0);
-        titles.addView(text("MonoPanel",25,WHITE,true));
-        runtimeValue=text("运行时长 00:00:00",13,Color.rgb(210,214,225),false);titles.addView(runtimeValue);
-        header.addView(titles,new LinearLayout.LayoutParams(0,-2,1));
-        TextView gear=text("⚙",25,WHITE,false);gear.setGravity(Gravity.CENTER);
-        gear.setBackground(shape(Color.argb(88,68,73,89),28));header.addView(gear,lp(48,48));
-        gear.setOnClickListener(v->{log("打开设置");showSettings();});
-        root.addView(header,lp(-1,78));
+        // The approved mockup is used as a single, unmodified full-screen composition.
+        FrameLayout frame=new FrameLayout(this);
+        ImageView artwork=new ImageView(this);
+        artwork.setImageResource(R.drawable.monopanel_home);
+        artwork.setScaleType(ImageView.ScaleType.FIT_XY);
+        frame.addView(artwork,new FrameLayout.LayoutParams(-1,-1));
+        setContentView(frame);
 
-        LinearLayout summary=horizontal(); summary.setGravity(Gravity.TOP);
-        LinearLayout cpu=vertical();cpu.setPadding(dp(16),dp(14),dp(14),dp(12));
-        cpu.addView(text("后台 CPU",17,WHITE,true));
-        averageCpu=text("平均 --.-%",16,WHITE,true);cpu.addView(averageCpu,lp(-1,26));
-        cpuHistory=new CpuHistoryView();cpu.addView(cpuHistory,lp(-1,68));
-        LinearLayout.LayoutParams cp= new LinearLayout.LayoutParams(0,dp(154),1.35f);
-        cp.rightMargin=dp(8);summary.addView(cpu,cp);cpu.setBackground(cardBg());
-
-        LinearLayout sys=vertical();sys.setPadding(dp(12),dp(13),dp(10),dp(10));
-        rootStatus=text("● Root 检测中",13,WHITE,true);sys.addView(rootStatus,lp(-1,32));
-        sys.addView(text("▣  内核版本",12,Color.rgb(218,222,232),false));
-        sys.addView(text(Build.VERSION.RELEASE+" · API "+Build.VERSION.SDK_INT,12,WHITE,false),lp(-1,26));
-        sys.addView(text("♨  CPU 温度",12,Color.rgb(218,222,232),false));
-        sys.addView(text("读取设备温度节点",12,WHITE,false),lp(-1,26));
-        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,dp(154),1);
-        summary.addView(sys,sp);sys.setBackground(cardBg());
-        root.addView(summary,lp(-1,154));
-
-        LinearLayout feature=vertical();feature.setPadding(dp(14),dp(10),dp(14),dp(10));
-        LinearLayout fh=horizontal();fh.addView(text("模块接口",18,WHITE,true),new LinearLayout.LayoutParams(0,dp(34),1));
-        TextView all=text("全部关闭",12,WHITE,true);all.setGravity(Gravity.CENTER);
-        all.setBackground(shape(Color.argb(72,115,122,140),18));all.setPadding(dp(10),0,dp(10),0);fh.addView(all,lp(76,30));
-        all.setOnClickListener(v->{for(int i=0;i<4;i++)setModule(i,false);});
-        feature.addView(fh);
-        for(int i=0;i<4;i++)addModuleRow(feature,i);
-        addCard(root,feature,14);
-
-        LinearLayout device=vertical();device.setPadding(dp(16),dp(12),dp(16),dp(14));
-        device.addView(text("设备信息",18,WHITE,true),lp(-1,36));
-        device.addView(infoLine("设备型号",Build.MANUFACTURER+" "+Build.MODEL));
-        device.addView(infoLine("Android 版本",Build.VERSION.RELEASE));
-        device.addView(infoLine("CPU 架构",Build.SUPPORTED_ABIS.length>0?Build.SUPPORTED_ABIS[0]:"未知"));
-        ActivityManager.MemoryInfo mi=new ActivityManager.MemoryInfo();((ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(mi);
-        device.addView(infoLine("可用内存",String.format(Locale.getDefault(),"%.1f GB",mi.availMem/1073741824.0)));
-        device.addView(infoLine("运行时长",runtimeValue==null?"00:00:00":runtimeValue.getText().toString()));
-        addCard(root,device,14);
-
-        LinearLayout shortcuts=vertical();shortcuts.setPadding(dp(16),dp(10),dp(16),dp(10));
-        shortcuts.addView(text("运行日志",18,WHITE,true),lp(-1,34));
-        String latest=logs.isEmpty()?"等待系统采样":logs.get(logs.size()-1);
-        shortcuts.addView(text("●  "+latest,12,WHITE,false),lp(-1,32));
-        TextView more=text("查看全部日志  ›",12,Color.rgb(210,214,225),false);
-        shortcuts.addView(more,lp(-1,28));more.setOnClickListener(v->showLogs());
-        addCard(root,shortcuts,14);
-
-        LinearLayout nav=horizontal();nav.setPadding(dp(8),dp(6),dp(8),dp(6));
-        String[] navNames={"⌂\n首页","◇\n模块","▦\n更多","ⓘ\n关于"};
-        for(int i=0;i<navNames.length;i++){
-            final int index=i;TextView item=text(navNames[i],14,i==0?WHITE:Color.rgb(210,214,225),i==0);
-            item.setGravity(Gravity.CENTER);nav.addView(item,new LinearLayout.LayoutParams(0,dp(54),1));
-            item.setOnClickListener(v->{if(index==1)showModules();else if(index==2)showSettings();else if(index==3)showDevice();else showHome();});
-        }
-        addCard(root,nav,14);
+        // Transparent hit areas preserve every pixel, font, icon and spacing in the approved artwork.
+        frame.post(()->{
+            int w=frame.getWidth(), h=frame.getHeight();
+            addHotspot(frame,w,h,0.535f,0.064f,0.410f,0.126f,()->showCpuMonitor());
+            addHotspot(frame,w,h,0.043f,0.212f,0.480f,0.064f,()->showDevice());
+            addHotspot(frame,w,h,0.044f,0.668f,0.276f,0.098f,()->showModules());
+            addHotspot(frame,w,h,0.359f,0.668f,0.273f,0.098f,()->showModules());
+            addHotspot(frame,w,h,0.668f,0.668f,0.276f,0.098f,()->showSettings());
+            addHotspot(frame,w,h,0.044f,0.785f,0.276f,0.098f,()->showCpuMonitor());
+            addHotspot(frame,w,h,0.359f,0.785f,0.273f,0.098f,()->showModules());
+            addHotspot(frame,w,h,0.668f,0.785f,0.276f,0.098f,()->finish());
+        });
     }
+
+    private void addHotspot(FrameLayout frame,int width,int height,float x,float y,float w,float h,Runnable action){
+        View hit=new View(this);
+        hit.setBackgroundColor(Color.TRANSPARENT);
+        hit.setClickable(true);
+        hit.setOnClickListener(v->action.run());
+        FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(Math.round(width*w),Math.round(height*h));
+        p.leftMargin=Math.round(width*x);p.topMargin=Math.round(height*y);
+        frame.addView(hit,p);
+    }
+
+    private void showCpuMonitor(){
+        initPage("实时 CPU 监控");
+        LinearLayout c=vertical();c.setPadding(dp(16),dp(12),dp(16),dp(12));
+        c.addView(text("CPU 使用率",18,WHITE,true),lp(-1,38));
+        averageCpu=text("CPU --.-%",28,WHITE,true);c.addView(averageCpu,lp(-1,54));
+        cpuHistory=new CpuHistoryView();c.addView(cpuHistory,lp(-1,120));
+        c.addView(text("采样间隔：0.5 秒",13,MUTED,false),lp(-1,30));
+        c.addView(infoLine("Root 状态",RootInfoReader.getLastStatus()));
+        c.addView(infoLine("系统信息",RootInfoReader.getLastDetails()));
+        addCard(root,c,14);
+    }
+
     private View infoLine(String k,String v){
         LinearLayout row=horizontal();row.setPadding(0,dp(4),0,dp(4));
         row.addView(text(k,13,MUTED,false),new LinearLayout.LayoutParams(0,dp(30),1));
