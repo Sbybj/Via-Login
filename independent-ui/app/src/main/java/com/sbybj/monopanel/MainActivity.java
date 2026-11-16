@@ -299,10 +299,6 @@ public class MainActivity extends Activity {
                 }
             }catch(Exception ignored){}
         }
-        if(Build.VERSION.SDK_INT>=30){
-            try{getWindow().getDecorView().setFrameRate(120f,android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);}
-            catch(Exception ignored){}
-        }
     }
 
     private void addHotspot(FrameLayout frame,int width,int height,float x,float y,float w,float h,Runnable action){
