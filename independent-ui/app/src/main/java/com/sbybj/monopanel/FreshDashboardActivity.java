@@ -323,7 +323,7 @@ public class FreshDashboardActivity extends Activity {
                     int usage = (int)Math.max(0, Math.min(100, 100f * (total - idle) / total));
                     cpuValue.setText(String.format(Locale.US, "%d%%", usage));
                     TextView status = findCpuStatusView();
-                    if (status != null) status.setText("数据源：/proc/stat · 正常读取");
+                    if (status != null) status.setText("Root 数据源：su → /proc/stat · 正常读取");
                     if (monitorCpu != null) monitorCpu.setText(cpuValue.getText());
                     cpuBar.setProgress(usage);
                 }
@@ -356,7 +356,7 @@ public class FreshDashboardActivity extends Activity {
             }
         } catch (Exception ignored) {}
         boolean suFound = new java.io.File("/system/bin/su").exists() || new java.io.File("/system/xbin/su").exists() || new java.io.File("/sbin/su").exists();
-        if (rootValue != null) rootValue.setText(suFound ? "检测到 su 文件" : "未检测到 su 文件");
+        if (rootValue != null && !suFound) rootValue.setText("未检测到 su 文件");
         if (monitorRoot != null) monitorRoot.setText(rootValue == null ? "检测中" : rootValue.getText());
     }
 
@@ -378,20 +378,32 @@ public class FreshDashboardActivity extends Activity {
     }
 
     private long[] readCpu() throws Exception {
-        // Linux aggregate CPU counters: user, nice, system, idle, iowait,
-        // irq, softirq, steal. Exclude guest/guest_nice because Linux already
-        // includes them in user/nice; counting them again distorts the total.
-        java.io.RandomAccessFile file = new java.io.RandomAccessFile("/proc/stat", "r");
+        // Read CPU counters through the granted Superuser (SukiSU/Magisk) shell.
+        Process process = new ProcessBuilder("su", "-c", "cat /proc/stat")
+            .redirectErrorStream(true).start();
+        String firstCpuLine = null;
         String line;
-        try { line = file.readLine(); } finally { file.close(); }
-        if (line == null || !line.startsWith("cpu ")) throw new java.io.IOException("Missing aggregate CPU counters");
-        String[] p = line.trim().split("\\s+");
-        if (p.length < 5) throw new java.io.IOException("Incomplete CPU counters");
+        try (BufferedReader reader = new BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream()))) {
+            while ((line = reader.readLine()) != null) {
+                if (firstCpuLine == null && line.startsWith("cpu ")) firstCpuLine = line;
+            }
+        }
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new java.io.IOException("su 命令退出码 " + exitCode
+                + (firstCpuLine == null ? "；请检查 SukiSU 授权" : ""));
+        }
+        if (firstCpuLine == null) {
+            throw new java.io.IOException("Root 已执行，但未取得 /proc/stat CPU 总计数");
+        }
+        String[] p = firstCpuLine.trim().split("\\s+");
+        if (p.length < 5) throw new java.io.IOException("CPU 计数格式不完整");
         long total = 0;
         int count = Math.min(p.length - 1, 8);
         for (int i = 1; i <= count; i++) total += Long.parseLong(p[i]);
         long idle = Long.parseLong(p[4]);
-        if (p.length > 5) idle += Long.parseLong(p[5]); // idle + iowait
+        if (p.length > 5) idle += Long.parseLong(p[5]);
         return new long[]{total, idle};
     }
 
