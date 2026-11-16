@@ -222,7 +222,11 @@ public class FreshDashboardActivity extends Activity {
                 for (android.view.Display.Mode mode : display.getSupportedModes()) {
                     if (mode.getRefreshRate() >= 119f && (best == null || mode.getRefreshRate() > best.getRefreshRate())) best = mode;
                 }
-                if (best != null) getWindow().setPreferredDisplayModeId(best.getModeId());
+                if (best != null) {
+                    android.view.WindowManager.LayoutParams attrs = getWindow().getAttributes();
+                    attrs.preferredDisplayModeId = best.getModeId();
+                    getWindow().setAttributes(attrs);
+                }
             } catch (Exception ignored) {}
         }
     }
