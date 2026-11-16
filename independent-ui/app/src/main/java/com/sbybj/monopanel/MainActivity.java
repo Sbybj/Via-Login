@@ -203,7 +203,7 @@ public class MainActivity extends Activity {
                 if(cpuHistory!=null)cpuHistory.setSamples(cpuSamples);
                 double avg=0;for(int n:cpuSamples)avg+=n;
                 avg=cpuSamples.isEmpty()?0:avg/cpuSamples.size();
-                if(averageCpu!=null)averageCpu.setText(String.format(Locale.getDefault(),"CPU %.1f%%",percent));
+                if(averageCpu!=null)averageCpu.setText(String.format(Locale.getDefault(),"CPU %.1f%%",(double)percent));
             }
         }
         previousRootTotal=total;previousRootIdle=idle;
