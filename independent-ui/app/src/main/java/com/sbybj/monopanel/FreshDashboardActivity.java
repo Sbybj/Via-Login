@@ -17,6 +17,8 @@ import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Locale;
 
 public class FreshDashboardActivity extends Activity {
@@ -164,6 +166,23 @@ public class FreshDashboardActivity extends Activity {
         esp.setOnCheckedChangeListener((button, checked) ->
             Toast.makeText(this, checked ? "透视接口尚未连接" : "已关闭", Toast.LENGTH_SHORT).show());
         feature.addView(esp);
+
+        LinearLayout screenOffCard = card();
+        screenOffCard.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams screenOffParams = matchWrap();
+        screenOffParams.topMargin = dp(10);
+        content.addView(screenOffCard, screenOffParams);
+        LinearLayout screenOffText = new LinearLayout(this);
+        screenOffText.setOrientation(LinearLayout.VERTICAL);
+        screenOffCard.addView(screenOffText, new LinearLayout.LayoutParams(0, -2, 1));
+        screenOffText.addView(label("熄屏", 16, white, true));
+        screenOffText.addView(label("执行内置 screen_off.sh · 需要 Root 授权", 10, muted, false));
+        TextView screenOffButton = label("立即熄屏", 12, white, true);
+        screenOffButton.setGravity(Gravity.CENTER);
+        screenOffButton.setPadding(dp(14), dp(10), dp(14), dp(10));
+        screenOffButton.setBackground(round(Color.rgb(42, 45, 52), 12));
+        screenOffCard.addView(screenOffButton);
+        screenOffButton.setOnClickListener(v -> runScreenOffScript());
 
         TextView foot = label("MONOPANEL  /  INDEPENDENT BUILD", 9, Color.rgb(82, 87, 96), true);
         foot.setGravity(Gravity.CENTER);
@@ -472,6 +491,42 @@ public class FreshDashboardActivity extends Activity {
         if (refreshRateStatusValue != null) refreshRateStatusValue.setText(readScreenRefreshRate());
         if (monitorRoot != null) monitorRoot.setText(rootValue == null ? "正在验证授权" : rootValue.getText());
         verifyRootAuthorization();
+    }
+
+    private void runScreenOffScript() {
+        new Thread(() -> {
+            int exitCode = -1;
+            String error = null;
+            try (InputStream script = getAssets().open("screen_off.sh")) {
+                Process process = new ProcessBuilder("su", "-c", "sh")
+                    .redirectErrorStream(true).start();
+                try (OutputStream shellInput = process.getOutputStream()) {
+                    byte[] buffer = new byte[1024];
+                    int count;
+                    while ((count = script.read(buffer)) != -1) {
+                        shellInput.write(buffer, 0, count);
+                    }
+                    shellInput.flush();
+                }
+                exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    StringBuilder output = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(
+                            new java.io.InputStreamReader(process.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) output.append(line).append(' ');
+                    }
+                    error = output.length() == 0 ? "su 退出码 " + exitCode : output.toString().trim();
+                }
+            } catch (Exception e) {
+                error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            }
+            final boolean success = exitCode == 0;
+            final String detail = error;
+            handler.post(() -> Toast.makeText(this,
+                success ? "熄屏命令已执行" : "熄屏失败：" + (detail == null ? "Root 未授权" : detail),
+                Toast.LENGTH_LONG).show());
+        }, "MonoPanel-ScreenOff").start();
     }
 
     private void requestHighRefreshRate() {
