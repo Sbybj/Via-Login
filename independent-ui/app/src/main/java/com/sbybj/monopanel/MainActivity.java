@@ -52,7 +52,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         startedAt=SystemClock.elapsedRealtime();
         getWindow().setStatusBarColor(BLACK); getWindow().setNavigationBarColor(BLACK);
-        log("应用启动"); showHome(); handler.post(monitor); RootInfoReader.startCpuMonitor(this,(granted,counters)->onCpuSample(granted,counters)); requestRootAccess();
+        log("应用启动"); showHome(); handler.post(monitor); requestRootAccess();
     }
     @Override protected void onDestroy(){ handler.removeCallbacks(monitor); RootInfoReader.stopCpuMonitor(); super.onDestroy(); }
 
@@ -277,6 +277,13 @@ public class MainActivity extends Activity {
             RootInfoReader.setLastResult(status,details);
             if(rootStatus!=null) rootStatus.setText(status+" · "+details);
             log(granted?"Root 授权成功":"Root 未授权或读取失败");
+            if(granted){
+                // Start the persistent CPU reader only after the permission check has completed.
+                RootInfoReader.startCpuMonitor(this,(ok,counters)->onCpuSample(ok,counters));
+            }else{
+                RootInfoReader.stopCpuMonitor();
+                previousRootTotal=-1; previousRootIdle=-1;
+            }
         });
     }
 
