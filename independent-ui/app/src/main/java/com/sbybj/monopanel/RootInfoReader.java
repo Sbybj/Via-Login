@@ -19,33 +19,53 @@ public final class RootInfoReader {
     public static void setLastResult(String status,String details){ lastStatus=status; lastDetails=details; }
 
 
-    /** Reads aggregate CPU counters through su. Values are total ticks and idle ticks. */
-    public static void readCpuStat(Activity activity, CpuCallback callback){
-        new Thread(() -> {
-            boolean granted=false;
-            long[] counters=null;
+    /** Persistent root reader: one su process streams /proc/stat at 10 Hz. */
+    private static volatile boolean cpuRunning=false;
+    private static volatile Process cpuProcess;
+    private static Thread cpuThread;
+
+    public static synchronized void startCpuMonitor(Activity activity,CpuCallback callback){
+        stopCpuMonitor();
+        cpuRunning=true;
+        cpuThread=new Thread(()->{
             Process process=null;
-            try {
-                process=new ProcessBuilder("su","-c","cat /proc/stat").redirectErrorStream(true).start();
-                if(process.waitFor(5,TimeUnit.SECONDS)){
-                    BufferedReader reader=new BufferedReader(new InputStreamReader(process.getInputStream()));
-                    String line=reader.readLine();
-                    if(line!=null && line.startsWith("cpu ")){
+            try{
+                process=new ProcessBuilder("su","-c","while true; do cat /proc/stat; sleep 0.1; done")
+                        .redirectErrorStream(true).start();
+                cpuProcess=process;
+                BufferedReader reader=new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String line;
+                while(cpuRunning && (line=reader.readLine())!=null){
+                    if(!line.startsWith("cpu ")) continue;
+                    try{
                         String[] fields=line.trim().split("\\s+");
+                        if(fields.length<5) continue;
                         long total=0;
                         for(int i=1;i<fields.length;i++) total+=Long.parseLong(fields[i]);
                         long idle=Long.parseLong(fields[4])+(fields.length>5?Long.parseLong(fields[5]):0);
-                        counters=new long[]{total,idle};
-                        granted=true;
-                    }
-                } else process.destroyForcibly();
-            } catch(Exception ignored) {
-            } finally { if(process!=null)process.destroy(); }
-            final boolean ok=granted;
-            final long[] result=counters;
-            new Handler(Looper.getMainLooper()).post(() -> callback.onResult(ok,result));
-        }).start();
+                        final long[] sample={total,idle};
+                        new Handler(Looper.getMainLooper()).post(()->{
+                            if(cpuRunning) callback.onResult(true,sample);
+                        });
+                    }catch(Exception ignored){}
+                }
+            }catch(Exception ignored){
+                new Handler(Looper.getMainLooper()).post(()->callback.onResult(false,null));
+            }finally{
+                if(process!=null)process.destroy();
+                if(cpuProcess==process)cpuProcess=null;
+            }
+        },"MonoPanel-Root-CPU").start();
     }
+
+    public static synchronized void stopCpuMonitor(){
+        cpuRunning=false;
+        Process p=cpuProcess;
+        if(p!=null)p.destroy();
+        cpuProcess=null;
+        if(cpuThread!=null){cpuThread.interrupt();cpuThread=null;}
+    }
+
     public interface CpuCallback { void onResult(boolean granted,long[] counters); }
 
     public static void read(Activity activity, Callback callback){
