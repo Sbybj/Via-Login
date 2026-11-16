@@ -76,7 +76,7 @@ public class MainActivity extends Activity {
     private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));}
     private void initPage(String title){
         FrameLayout frame=new FrameLayout(this);
-        frame.setBackgroundColor(BLACK);
+        frame.setBackgroundResource(R.drawable.wallpaper);
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true);
         scroll.setBackgroundColor(Color.TRANSPARENT);
         root=vertical(); root.setPadding(dp(18),dp(18),dp(18),dp(24)); scroll.addView(root);
