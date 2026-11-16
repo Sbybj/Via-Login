@@ -14,6 +14,7 @@ import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.widget.FrameLayout;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -34,8 +35,8 @@ public class MainActivity extends Activity {
     private final int BLACK=Color.rgb(4,4,4), WHITE=Color.rgb(245,245,245), MUTED=Color.rgb(150,150,150);
     private final Handler handler=new Handler(Looper.getMainLooper());
     private LinearLayout root;
-    private TextView cpuDetail, runtimeValue, statusValue, rootStatus;
-    private CpuGaugeView cpuGauge;
+    private TextView cpuDetail, runtimeValue, statusValue, rootStatus, averageCpu;
+    private CpuHistoryView cpuHistory;
     private long startedAt, previousRootTotal=-1, previousRootIdle=-1;
     private final ArrayList<String> logs=new ArrayList<>();
     private final String[] ids={"module_1","module_2","module_3","module_4"};
@@ -43,7 +44,7 @@ public class MainActivity extends Activity {
     private final String[] names={"模块一","模块二","模块三","模块四"};
     private final String[] descriptions={"独立模块接口 A","独立模块接口 B","独立模块接口 C","独立模块接口 D"};
     private final Runnable monitor=new Runnable(){ public void run(){
-        if(cpuGauge!=null){ sampleRootCpu(); updateRuntime(); }
+        if(cpuHistory!=null){ sampleRootCpu(); updateRuntime(); }
         handler.postDelayed(this,2000);
     }};
 
@@ -61,8 +62,8 @@ public class MainActivity extends Activity {
     }
     private GradientDrawable cardBg(){
         GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.rgb(29,29,29),Color.rgb(13,13,13)});
-        d.setCornerRadius(dp(20)); d.setStroke(dp(1),Color.rgb(42,42,42)); return d;
+                new int[]{Color.argb(164,72,78,94),Color.argb(142,22,25,35)});
+        d.setCornerRadius(dp(24)); return d;
     }
     private TextView text(String s,int size,int color,boolean bold){
         TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(color);
@@ -72,8 +73,13 @@ public class MainActivity extends Activity {
     private LinearLayout horizontal(){LinearLayout l=new LinearLayout(this);l.setOrientation(0);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
     private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));}
     private void initPage(String title){
-        ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(BLACK);
-        root=vertical(); root.setPadding(dp(18),dp(18),dp(18),dp(24)); scroll.addView(root); setContentView(scroll);
+        FrameLayout frame=new FrameLayout(this);
+        frame.setBackgroundColor(BLACK);
+        ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.TRANSPARENT);
+        root=vertical(); root.setPadding(dp(18),dp(18),dp(18),dp(24)); scroll.addView(root);
+        frame.addView(scroll,new FrameLayout.LayoutParams(-1,-1));
+        setContentView(frame);
         LinearLayout bar=horizontal();
         TextView back=text("‹",36,WHITE,true); back.setGravity(Gravity.CENTER); bar.addView(back,lp(44,48));
         back.setOnClickListener(v->showHome());
@@ -89,59 +95,72 @@ public class MainActivity extends Activity {
     }
 
     private void showHome(){
-        initPage("游戏内核辅助");
-        LinearLayout header=horizontal(); header.setPadding(dp(12),dp(8),dp(8),dp(8));
-        TextView logo=text("△",48,WHITE,true);logo.setGravity(Gravity.CENTER);header.addView(logo,lp(72,70));
-        LinearLayout titles=vertical();titles.addView(text("游戏内核辅助",22,WHITE,true));titles.addView(text("系统监控 · 模块管理",13,MUTED,false));
+        initPage("MonoPanel");
+        LinearLayout header=horizontal(); header.setPadding(dp(10),dp(4),dp(8),dp(8));
+        TextView logo=text("M",40,WHITE,true);logo.setGravity(Gravity.CENTER);
+        logo.setBackground(shape(Color.argb(185,38,43,58),22));header.addView(logo,lp(66,66));
+        LinearLayout titles=vertical();titles.setPadding(dp(14),0,0,0);
+        titles.addView(text("MonoPanel",25,WHITE,true));
+        titles.addView(text("极简 · 专注 · 专业",13,Color.rgb(210,214,225),false));
         header.addView(titles,new LinearLayout.LayoutParams(0,-2,1));
-        TextView gear=text("⚙",28,WHITE,false);gear.setGravity(Gravity.CENTER);gear.setBackground(shape(Color.rgb(40,40,40),16));header.addView(gear,lp(52,52));
+        TextView gear=text("⚙",25,WHITE,false);gear.setGravity(Gravity.CENTER);
+        gear.setBackground(shape(Color.argb(145,68,73,89),28));header.addView(gear,lp(48,48));
         gear.setOnClickListener(v->{log("打开设置");showSettings();});
-        addCard(root,header,0);
+        root.addView(header,lp(-1,78));
 
-        LinearLayout status=vertical();status.setPadding(dp(16),dp(14),dp(16),dp(14));
-        LinearLayout top=horizontal();top.addView(text("运行状态",15,MUTED,false),new LinearLayout.LayoutParams(0,dp(30),1));
-        statusValue=text("● 运行中",15,WHITE,true);top.addView(statusValue);status.addView(top);
-        LinearLayout stats=horizontal();
-        LinearLayout cpu=vertical();cpu.addView(text("CPU 总占用率",13,MUTED,false));
-        cpuGauge=new CpuGaugeView();cpu.addView(cpuGauge,lp(116,116));
-        cpuDetail=text("Root 读取 /proc/stat",11,MUTED,false);cpu.addView(cpuDetail);
-        stats.addView(cpu,new LinearLayout.LayoutParams(0,-2,1));
-        LinearLayout rt=vertical();rt.addView(text("本次运行时长",13,MUTED,false));runtimeValue=text("00:00:00",23,WHITE,true);rt.addView(runtimeValue);
-        stats.addView(rt,new LinearLayout.LayoutParams(0,-2,1));status.addView(stats);
-        addCard(root,status,14);
+        LinearLayout summary=horizontal(); summary.setGravity(Gravity.TOP);
+        LinearLayout cpu=vertical();cpu.setPadding(dp(16),dp(14),dp(14),dp(12));
+        cpu.addView(text("后台 CPU",17,WHITE,true));
+        averageCpu=text("平均 --.-%",16,WHITE,true);cpu.addView(averageCpu,lp(-1,26));
+        cpuHistory=new CpuHistoryView();cpu.addView(cpuHistory,lp(-1,68));
+        LinearLayout.LayoutParams cp= new LinearLayout.LayoutParams(0,dp(154),1.35f);
+        cp.rightMargin=dp(8);summary.addView(cpu,cp);cpu.setBackground(cardBg());
 
-        LinearLayout rootCard=horizontal(); rootCard.setPadding(dp(16),dp(10),dp(16),dp(10));
-        rootStatus=text("Root 权限：检测中…",13,WHITE,true); rootCard.addView(rootStatus,new LinearLayout.LayoutParams(0,dp(38),1));
-        TextView refreshRoot=text("检测 / 授权",12,WHITE,true); refreshRoot.setGravity(Gravity.CENTER); refreshRoot.setPadding(dp(10),0,dp(10),0); refreshRoot.setBackground(shape(Color.rgb(55,55,55),18)); rootCard.addView(refreshRoot,lp(-2,32));
-        refreshRoot.setOnClickListener(v->requestRootAccess());
-        addCard(root,rootCard,10);
+        LinearLayout sys=vertical();sys.setPadding(dp(12),dp(13),dp(10),dp(10));
+        rootStatus=text("● Root 检测中",13,WHITE,true);sys.addView(rootStatus,lp(-1,32));
+        sys.addView(text("▣  内核版本",12,Color.rgb(218,222,232),false));
+        sys.addView(text(Build.VERSION.RELEASE+" · API "+Build.VERSION.SDK_INT,12,WHITE,false),lp(-1,26));
+        sys.addView(text("♨  CPU 温度",12,Color.rgb(218,222,232),false));
+        sys.addView(text("读取设备温度节点",12,WHITE,false),lp(-1,26));
+        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,dp(154),1);
+        summary.addView(sys,sp);sys.setBackground(cardBg());
+        root.addView(summary,lp(-1,154));
 
-        LinearLayout feature=vertical();feature.setPadding(dp(16),dp(12),dp(16),dp(12));
-        LinearLayout fh=horizontal();fh.addView(text("模块接口",19,WHITE,true),new LinearLayout.LayoutParams(0,dp(42),1));
-        TextView all=text("全部启用",13,WHITE,true);all.setGravity(Gravity.CENTER);all.setBackground(shape(Color.rgb(55,55,55),22));all.setPadding(dp(12),0,dp(12),0);fh.addView(all,lp(92,34));all.setOnClickListener(v->{for(int i=0;i<4;i++)setModule(i,true);});
+        LinearLayout feature=vertical();feature.setPadding(dp(14),dp(10),dp(14),dp(10));
+        LinearLayout fh=horizontal();fh.addView(text("模块接口",18,WHITE,true),new LinearLayout.LayoutParams(0,dp(34),1));
+        TextView all=text("全部关闭",12,WHITE,true);all.setGravity(Gravity.CENTER);
+        all.setBackground(shape(Color.argb(100,115,122,140),18));all.setPadding(dp(10),0,dp(10),0);fh.addView(all,lp(76,30));
+        all.setOnClickListener(v->{for(int i=0;i<4;i++)setModule(i,false);});
         feature.addView(fh);
         for(int i=0;i<4;i++)addModuleRow(feature,i);
         addCard(root,feature,14);
 
         LinearLayout device=vertical();device.setPadding(dp(16),dp(12),dp(16),dp(14));
-        device.addView(text("设备信息",19,WHITE,true),lp(-1,38));
+        device.addView(text("设备信息",18,WHITE,true),lp(-1,36));
         device.addView(infoLine("设备型号",Build.MANUFACTURER+" "+Build.MODEL));
-        device.addView(infoLine("Android 版本",Build.VERSION.RELEASE+" (API "+Build.VERSION.SDK_INT+")"));
-        device.addView(infoLine("处理器架构",Build.SUPPORTED_ABIS.length>0?Build.SUPPORTED_ABIS[0]:"未知"));
+        device.addView(infoLine("Android 版本",Build.VERSION.RELEASE));
+        device.addView(infoLine("CPU 架构",Build.SUPPORTED_ABIS.length>0?Build.SUPPORTED_ABIS[0]:"未知"));
         ActivityManager.MemoryInfo mi=new ActivityManager.MemoryInfo();((ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(mi);
         device.addView(infoLine("可用内存",String.format(Locale.getDefault(),"%.1f GB",mi.availMem/1073741824.0)));
-        TextView more=text("查看完整设备信息  ›",13,WHITE,false);device.addView(more,lp(-1,38));more.setOnClickListener(v->showDevice());
+        device.addView(infoLine("运行时长",runtimeValue==null?"00:00:00":runtimeValue.getText().toString()));
         addCard(root,device,14);
 
-        LinearLayout shortcuts=vertical();shortcuts.setPadding(dp(16),dp(12),dp(16),dp(12));
-        shortcuts.addView(text("快捷入口",19,WHITE,true),lp(-1,38));
-        addAction(shortcuts,"界面设置","设置界面参数",()->showSettings());
-        addAction(shortcuts,"功能管理","管理模块开关及接口",()->showModules());
-        addAction(shortcuts,"运行日志","查看本地操作记录",()->showLogs());
-        addAction(shortcuts,"退出应用","关闭当前面板",()->{log("退出应用");finish();});
+        LinearLayout shortcuts=vertical();shortcuts.setPadding(dp(16),dp(10),dp(16),dp(10));
+        shortcuts.addView(text("运行日志",18,WHITE,true),lp(-1,34));
+        String latest=logs.isEmpty()?"等待系统采样":logs.get(logs.size()-1);
+        shortcuts.addView(text("●  "+latest,12,WHITE,false),lp(-1,32));
+        TextView more=text("查看全部日志  ›",12,Color.rgb(210,214,225),false);
+        shortcuts.addView(more,lp(-1,28));more.setOnClickListener(v->showLogs());
         addCard(root,shortcuts,14);
-        TextView footer=text("MONOPANEL  ·  LOCAL SYSTEM MONITOR",10,MUTED,false);footer.setGravity(Gravity.CENTER);
-        root.addView(footer,lp(-1,48));
+
+        LinearLayout nav=horizontal();nav.setPadding(dp(8),dp(6),dp(8),dp(6));
+        String[] navNames={"⌂\n首页","◇\n模块","▦\n更多","ⓘ\n关于"};
+        for(int i=0;i<navNames.length;i++){
+            final int index=i;TextView item=text(navNames[i],14,i==0?WHITE:Color.rgb(210,214,225),i==0);
+            item.setGravity(Gravity.CENTER);nav.addView(item,new LinearLayout.LayoutParams(0,dp(54),1));
+            item.setOnClickListener(v->{if(index==1)showModules();else if(index==2)showSettings();else if(index==3)showDevice();else showHome();});
+        }
+        addCard(root,nav,14);
     }
     private View infoLine(String k,String v){
         LinearLayout row=horizontal();row.setPadding(0,dp(4),0,dp(4));
@@ -167,12 +186,12 @@ public class MainActivity extends Activity {
         row.addView(labels,new LinearLayout.LayoutParams(0,dp(54),1));row.addView(text("›",24,MUTED,false),lp(30,48));
         row.setOnClickListener(v->action.run());parent.addView(row,lp(-1,58));
     }
+    private final ArrayList<Integer> cpuSamples=new ArrayList<>();
     private void sampleRootCpu(){
         RootInfoReader.readCpuStat(this,(granted,counters)->{
-            if(cpuGauge==null)return;
+            if(cpuHistory==null)return;
             if(!granted||counters==null||counters.length<2){
-                cpuGauge.setUnavailable();
-                cpuDetail.setText("Root 未授权，无法读取 /proc/stat");
+                cpuHistory.invalidate();averageCpu.setText("平均 --.-%");
                 previousRootTotal=-1;previousRootIdle=-1;return;
             }
             long total=counters[0], idle=counters[1];
@@ -180,38 +199,41 @@ public class MainActivity extends Activity {
                 long dt=total-previousRootTotal, di=idle-previousRootIdle;
                 if(dt>0){
                     int percent=(int)Math.max(0,Math.min(100,Math.round((dt-di)*100.0/dt)));
-                    cpuGauge.setPercent(percent);
-                    cpuDetail.setText("Root 读取 /proc/stat · 实时刷新");
+                    cpuSamples.add(percent);while(cpuSamples.size()>30)cpuSamples.remove(0);
+                    cpuHistory.setSamples(cpuSamples);
+                    double avg=0;for(int n:cpuSamples)avg+=n;
+                    avg=cpuSamples.isEmpty()?0:avg/cpuSamples.size();
+                    averageCpu.setText(String.format(Locale.getDefault(),"平均 %.1f%%",avg));
                 }
-            } else {
-                cpuGauge.setUnavailable();
-                cpuDetail.setText("Root 已连接，正在采集基准值…");
             }
             previousRootTotal=total;previousRootIdle=idle;
         });
     }
 
-    /** Monochrome circular CPU utilization gauge. */
-    private class CpuGaugeView extends View {
-        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF arc=new RectF();
-        private int percent=-1;
-        CpuGaugeView(){super(MainActivity.this);}
-        void setPercent(int value){percent=Math.max(0,Math.min(100,value));invalidate();}
-        void setUnavailable(){percent=-1;invalidate();}
-        @Override protected void onDraw(Canvas canvas){
-            super.onDraw(canvas);
-            float cx=getWidth()/2f, cy=getHeight()/2f;
-            float stroke=dp(8), radius=Math.min(getWidth(),getHeight())/2f-stroke;
-            arc.set(cx-radius,cy-radius,cx+radius,cy+radius);
-            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(stroke);paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setColor(Color.rgb(55,55,55));canvas.drawArc(arc,-90,360,false,paint);
-            if(percent>=0){paint.setColor(WHITE);canvas.drawArc(arc,-90,360f*percent/100f,false,paint);}
-            paint.setStyle(Paint.Style.FILL);paint.setColor(WHITE);paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTypeface(Typeface.create(Typeface.DEFAULT,Typeface.BOLD));paint.setTextSize(dp(27));
-            String value=percent<0?"--":percent+"%";
-            Paint.FontMetrics fm=paint.getFontMetrics();
-            canvas.drawText(value,cx,cy-(fm.ascent+fm.descent)/2f,paint);
+    /** Compact live CPU history chart, styled like the supplied monitoring widget. */
+    private class CpuHistoryView extends View {
+        private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final ArrayList<Integer> values=new ArrayList<>();
+        CpuHistoryView(){super(MainActivity.this);}
+        void setSamples(ArrayList<Integer> samples){values.clear();values.addAll(samples);invalidate();}
+        @Override protected void onDraw(Canvas c){
+            super.onDraw(c);
+            float w=getWidth(),h=getHeight();
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(2.5f));p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
+            p.setColor(Color.rgb(38,157,229));
+            if(values.size()==1){float y=h*.55f;c.drawLine(0,y,w,y,p);return;}
+            if(values.size()>1){
+                android.graphics.Path path=new android.graphics.Path();
+                for(int i=0;i<values.size();i++){
+                    float x=(w-dp(4))*i/(float)(Math.max(1,values.size()-1))+dp(2);
+                    float y=h-dp(8)-(values.get(i)/100f)*(h-dp(16));
+                    if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
+                }
+                c.drawPath(path,p);
+            } else {
+                p.setColor(Color.argb(110,38,157,229));
+                c.drawLine(0,h*.65f,w,h*.65f,p);
+            }
         }
     }
 
