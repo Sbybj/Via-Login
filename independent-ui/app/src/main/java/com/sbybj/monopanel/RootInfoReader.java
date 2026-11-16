@@ -55,7 +55,8 @@ public final class RootInfoReader {
                 if(process!=null)process.destroy();
                 if(cpuProcess==process)cpuProcess=null;
             }
-        },"MonoPanel-Root-CPU").start();
+        },"MonoPanel-Root-CPU");
+        cpuThread.start();
     }
 
     public static synchronized void stopCpuMonitor(){
