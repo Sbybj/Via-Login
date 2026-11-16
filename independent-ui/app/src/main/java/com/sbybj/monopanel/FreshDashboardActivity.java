@@ -27,11 +27,16 @@ public class FreshDashboardActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView cpuValue, ramValue, batteryValue, rootValue;
     private android.widget.ProgressBar cpuBar;
+    private ScrollView mainScroll;
+    private LinearLayout homePage;
+    private TextView[] navLabels;
+    private int activeTab = 0;
+    private int refreshIntervalMs = 500;
     private long previousIdle, previousTotal;
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
             refreshMetrics();
-            handler.postDelayed(this, 500);
+            handler.postDelayed(this, refreshIntervalMs);
         }
     };
 
@@ -52,10 +57,12 @@ public class FreshDashboardActivity extends Activity {
         setContentView(root);
 
         ScrollView scroll = new ScrollView(this);
+        mainScroll = scroll;
         scroll.setFillViewport(true);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
         LinearLayout content = new LinearLayout(this);
+        homePage = content;
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(22), dp(24), dp(22), dp(20));
         scroll.addView(content);
@@ -162,12 +169,111 @@ public class FreshDashboardActivity extends Activity {
         nav.setBackgroundColor(Color.rgb(13, 14, 18));
         root.addView(nav, new LinearLayout.LayoutParams(-1, dp(62)));
         String[] tabs = {"首页", "监控", "功能", "设置"};
+        navLabels = new TextView[tabs.length];
         for (int i = 0; i < tabs.length; i++) {
+            final int index = i;
             TextView t = label((i == 0 ? "◆  " : "◇  ") + tabs[i], 11,
                 i == 0 ? white : muted, i == 0);
             t.setGravity(Gravity.CENTER);
+            navLabels[i] = t;
             nav.addView(t, new LinearLayout.LayoutParams(0, -1, 1));
+            t.setOnClickListener(v -> selectTab(index));
         }
+    }
+
+
+    private void selectTab(int index) {
+        activeTab = index;
+        View page;
+        if (index == 0) page = homePage;
+        else if (index == 1) page = buildMonitorPage();
+        else if (index == 2) page = buildFeaturePage();
+        else page = buildSettingsPage();
+        mainScroll.removeAllViews();
+        mainScroll.addView(page);
+        for (int i = 0; i < navLabels.length; i++) {
+            navLabels[i].setText((i == index ? "◆  " : "◇  ") + new String[]{"首页","监控","功能","设置"}[i]);
+            navLabels[i].setTextColor(i == index ? white : muted);
+            navLabels[i].setTypeface(Typeface.create("sans-serif", i == index ? Typeface.BOLD : Typeface.NORMAL));
+        }
+        mainScroll.scrollTo(0, 0);
+    }
+
+    private LinearLayout pageBase(String title, String subtitle) {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(22), dp(24), dp(22), dp(24));
+        page.addView(label("MONOPANEL", 12, muted, true));
+        TextView h = label(title, 27, white, true);
+        h.setPadding(0, dp(5), 0, dp(5));
+        page.addView(h);
+        page.addView(label(subtitle, 10, muted, false));
+        return page;
+    }
+
+    private LinearLayout buildMonitorPage() {
+        LinearLayout p = pageBase("实时监控", "LIVE METRICS  /  每 0.5 秒刷新");
+        LinearLayout c = card(); c.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams cp = matchWrap(); cp.topMargin = dp(22); p.addView(c, cp);
+        c.addView(label("CPU 使用率", 13, muted, true));
+        TextView cpu = label(cpuValue == null ? "--%" : cpuValue.getText().toString(), 38, white, true);
+        cpu.setPadding(0, dp(10), 0, dp(5)); c.addView(cpu);
+        c.addView(label("系统总内存使用量", 13, muted, true));
+        TextView ram = label(ramValue == null ? "--" : ramValue.getText().toString(), 28, white, true);
+        ram.setPadding(0, dp(8), 0, dp(15)); c.addView(ram);
+        c.addView(label("电池电量", 13, muted, true));
+        TextView bat = label(batteryValue == null ? "--" : batteryValue.getText().toString(), 28, white, true);
+        bat.setPadding(0, dp(8), 0, dp(15)); c.addView(bat);
+        addDivider(c);
+        addStat(c, "GPU 负载", "未接入传感器");
+        addDivider(c); addStat(c, "实时 FPS", "未接入帧率源");
+        addDivider(c); addStat(c, "屏幕刷新率", "请求 120Hz（系统可能限制）");
+        addDivider(c); addStat(c, "Root 状态", rootValue == null ? "检测中" : rootValue.getText().toString());
+        TextView note = label("说明：未接入的数据不会用模拟数值填充。", 10, muted, false);
+        note.setPadding(0, dp(16), 0, 0); p.addView(note);
+        return p;
+    }
+
+    private LinearLayout buildFeaturePage() {
+        LinearLayout p = pageBase("功能中心", "FEATURE MODULES  /  接口状态");
+        LinearLayout c = card(); c.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams cp = matchWrap(); cp.topMargin = dp(22); p.addView(c, cp);
+        LinearLayout text = new LinearLayout(this); text.setOrientation(LinearLayout.VERTICAL);
+        c.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
+        text.addView(label("透视", 17, white, true));
+        text.addView(label("功能开关与接口占位，尚未连接", 10, muted, false));
+        Switch sw = new Switch(this);
+        sw.setOnCheckedChangeListener((b, checked) ->
+            Toast.makeText(this, checked ? "透视模块未接入，当前不会执行操作" : "已关闭", Toast.LENGTH_SHORT).show());
+        c.addView(sw);
+        TextView desc = label("除透视模块外，其他系统监控、刷新设置和页面导航均可独立使用。", 11, muted, false);
+        desc.setPadding(2, dp(18), 2, 0); p.addView(desc);
+        return p;
+    }
+
+    private LinearLayout buildSettingsPage() {
+        LinearLayout p = pageBase("设置", "DISPLAY  /  APPLICATION");
+        LinearLayout c = card(); c.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams cp = matchWrap(); cp.topMargin = dp(22); p.addView(c, cp);
+        addStat(c, "CPU / 内存采样间隔", "500 ms");
+        addDivider(c);
+        addStat(c, "目标屏幕刷新率", "120 Hz");
+        addDivider(c);
+        addStat(c, "应用版本", "1.4");
+        addDivider(c);
+        addStat(c, "主题", "黑白 · 深色");
+        addDivider(c);
+        addStat(c, "数据策略", "仅显示真实读取值");
+        TextView refresh = label("重新请求高刷新率", 13, white, true);
+        refresh.setGravity(Gravity.CENTER);
+        refresh.setPadding(0, dp(16), 0, dp(16));
+        refresh.setBackground(round(Color.rgb(30,32,38), 12));
+        LinearLayout.LayoutParams rp = matchWrap(); rp.topMargin = dp(14); p.addView(refresh, rp);
+        refresh.setOnClickListener(v -> {
+            requestHighRefreshRate();
+            Toast.makeText(this, "已向系统请求可用的 120Hz 显示模式", Toast.LENGTH_SHORT).show();
+        });
+        return p;
     }
 
     private LinearLayout metricCard(String tag, String title, String value, String unit) {
