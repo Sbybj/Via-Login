@@ -98,27 +98,132 @@ public class MainActivity extends Activity {
         while(logs.size()>100)logs.remove(0);
     }
 
+    private TextView homeTime, homeDate, homeCpuPercent, homeRootStatus;
+    private CpuRingView homeRing;
+    private final Runnable homeClock = new Runnable(){ public void run(){
+        if(homeTime!=null){
+            java.text.SimpleDateFormat tf=new java.text.SimpleDateFormat("HH:mm",Locale.getDefault());
+            java.text.SimpleDateFormat df=new java.text.SimpleDateFormat("M月d日  EEEE",Locale.CHINA);
+            homeTime.setText(tf.format(new java.util.Date()));
+            homeDate.setText(df.format(new java.util.Date()));
+        }
+        handler.postDelayed(this,1000);
+    }};
+    private View glassCard(){
+        android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{Color.argb(112,150,150,160),Color.argb(78,50,50,58),Color.argb(88,18,18,24)});
+        d.setCornerRadius(dp(26));
+        d.setStroke(dp(1),Color.argb(42,255,255,255));
+        View v=new View(this);v.setBackground(d);return v;
+    }
+    private LinearLayout cardContainer(){
+        LinearLayout c=vertical();c.setPadding(dp(16),dp(12),dp(16),dp(12));
+        c.setBackground(glassCard().getBackground());return c;
+    }
     private void showHome(){
-        // The approved mockup is used as a single, unmodified full-screen composition.
         FrameLayout frame=new FrameLayout(this);
-        ImageView artwork=new ImageView(this);
-        artwork.setImageResource(R.drawable.monopanel_home);
-        artwork.setScaleType(ImageView.ScaleType.FIT_XY);
-        frame.addView(artwork,new FrameLayout.LayoutParams(-1,-1));
-        setContentView(frame);
+        ImageView wallpaper=new ImageView(this);
+        wallpaper.setImageResource(R.drawable.wallpaper);
+        wallpaper.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        frame.addView(wallpaper,new FrameLayout.LayoutParams(-1,-1));
+        View shade=new View(this);shade.setBackgroundColor(Color.argb(38,0,0,0));
+        frame.addView(shade,new FrameLayout.LayoutParams(-1,-1));
 
-        // Transparent hit areas preserve every pixel, font, icon and spacing in the approved artwork.
-        frame.post(()->{
-            int w=frame.getWidth(), h=frame.getHeight();
-            addHotspot(frame,w,h,0.535f,0.064f,0.410f,0.126f,()->showCpuMonitor());
-            addHotspot(frame,w,h,0.043f,0.212f,0.480f,0.064f,()->showDevice());
-            addHotspot(frame,w,h,0.044f,0.668f,0.276f,0.098f,()->showModules());
-            addHotspot(frame,w,h,0.359f,0.668f,0.273f,0.098f,()->showModules());
-            addHotspot(frame,w,h,0.668f,0.668f,0.276f,0.098f,()->showSettings());
-            addHotspot(frame,w,h,0.044f,0.785f,0.276f,0.098f,()->showCpuMonitor());
-            addHotspot(frame,w,h,0.359f,0.785f,0.273f,0.098f,()->showModules());
-            addHotspot(frame,w,h,0.668f,0.785f,0.276f,0.098f,()->finish());
-        });
+        LinearLayout page=vertical();
+        page.setPadding(dp(18),dp(12),dp(18),dp(16));
+        FrameLayout.LayoutParams pageParams=new FrameLayout.LayoutParams(-1,-1);
+        frame.addView(page,pageParams);
+
+        LinearLayout top=horizontal();
+        LinearLayout dateCard=cardContainer();
+        homeTime=text("--:--",48,WHITE,false);
+        homeTime.setGravity(Gravity.CENTER_VERTICAL);
+        homeDate=text("--月--日",17,WHITE,false);
+        dateCard.addView(homeTime,lp(-1,68));dateCard.addView(homeDate,lp(-1,30));
+        LinearLayout cpuCard=cardContainer();
+        LinearLayout cpuRow=horizontal();
+        homeRing=new CpuRingView();
+        cpuRow.addView(homeRing,new LinearLayout.LayoutParams(dp(104),dp(104)));
+        LinearLayout cpuLabels=vertical();cpuLabels.setPadding(dp(10),0,0,0);
+        cpuLabels.addView(text("CPU",17,WHITE,false),lp(-1,30));
+        homeCpuPercent=text("--%",22,WHITE,false);
+        cpuLabels.addView(homeCpuPercent,lp(-1,34));
+        cpuLabels.addView(text("实时占用率",10,Color.LTGRAY,false),lp(-1,24));
+        cpuRow.addView(cpuLabels,new LinearLayout.LayoutParams(0,-1,1));
+        cpuCard.addView(cpuRow,new LinearLayout.LayoutParams(-1,-1));
+        top.addView(dateCard,new LinearLayout.LayoutParams(0,dp(124),1));
+        View gap=new View(this);top.addView(gap,new LinearLayout.LayoutParams(dp(12),1));
+        top.addView(cpuCard,new LinearLayout.LayoutParams(0,dp(124),1));
+        page.addView(top,lp(-1,124));
+
+        LinearLayout rootCard=cardContainer();rootCard.setOrientation(0);
+        TextView shield=text("✓",30,WHITE,true);shield.setGravity(Gravity.CENTER);
+        rootCard.addView(shield,lp(54,-1));
+        LinearLayout rootLabels=vertical();
+        rootLabels.addView(text("Root 权限状态",17,WHITE,true),lp(-1,28));
+        homeRootStatus=text("正在检测授权…",13,Color.LTGRAY,false);
+        rootLabels.addView(homeRootStatus,lp(-1,24));
+        rootCard.addView(rootLabels,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout.LayoutParams rootParams=lp(-1,64);rootParams.topMargin=dp(18);page.addView(rootCard,rootParams);
+
+        View spacer=new View(this);page.addView(spacer,new LinearLayout.LayoutParams(1,0,1));
+
+        LinearLayout row1=horizontal(),row2=horizontal();
+        addHomeButton(row1,"⊙","透视开关",()->{if(moduleListener!=null)moduleListener.onAction("toggle_overlay");showModules();});
+        addHomeButton(row1,"◉","透视设置",()->{if(moduleListener!=null)moduleListener.onAction("overlay_settings");showSettings();});
+        addHomeButton(row1,"⚙","功能设置",()->showSettings());
+        addHomeButton(row2,"▣","实时监控",()->showCpuMonitor());
+        addHomeButton(row2,"▦","更多功能",()->showModules());
+        addHomeButton(row2,"⏻","退出应用",()->finish());
+        page.addView(row1,lp(-1,dp(132))); 
+        page.addView(row2,lp(-1,dp(132)));
+        LinearLayout.LayoutParams rowGap=lp(-1,dp(12));page.addView(new View(this),rowGap);
+
+        LinearLayout footer=horizontal();footer.setGravity(Gravity.CENTER);
+        footer.setPadding(dp(18),0,dp(18),0);footer.setBackground(glassCard().getBackground());
+        TextView version=text("ⓘ  MonoPanel v1.0",14,WHITE,false);
+        footer.addView(version,new LinearLayout.LayoutParams(0,dp(54),1));
+        TextView divider=text("|",18,Color.LTGRAY,false);footer.addView(divider,lp(24,54));
+        TextView status=text("●  稳定运行中…",14,WHITE,false);
+        footer.addView(status,new LinearLayout.LayoutParams(0,dp(54),1));
+        LinearLayout.LayoutParams footerP=lp(-1,54);footerP.topMargin=dp(18);page.addView(footer,footerP);
+
+        setContentView(frame);
+        homeClock.run();
+        if(homeCpuPercent!=null&&!cpuSamples.isEmpty()){
+            int v=cpuSamples.get(cpuSamples.size()-1);
+            homeCpuPercent.setText(v+"%");homeRing.setPercent(v);
+        }
+        String rs=RootInfoReader.getLastStatus();
+        if(homeRootStatus!=null)homeRootStatus.setText(rs==null||rs.isEmpty()?"等待 Root 授权":rs);
+    }
+    private void addHomeButton(LinearLayout row,String icon,String label,Runnable action){
+        LinearLayout button=vertical();button.setGravity(Gravity.CENTER);
+        button.setBackground(glassCard().getBackground());
+        TextView glyph=text(icon,34,WHITE,true);glyph.setGravity(Gravity.CENTER);
+        TextView caption=text(label,15,WHITE,false);caption.setGravity(Gravity.CENTER);
+        button.addView(glyph,new LinearLayout.LayoutParams(-1,dp(58)));
+        button.addView(caption,new LinearLayout.LayoutParams(-1,dp(34)));
+        button.setOnClickListener(v->action.run());
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(132),1);
+        p.setMargins(dp(0),0,dp(0),0);
+        row.addView(button,p);
+        if(row.getChildCount()<3){View gap=new View(this);row.addView(gap,new LinearLayout.LayoutParams(dp(14),1));}
+    }
+    private class CpuRingView extends View {
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private int percent=0;
+        CpuRingView(){super(MainActivity.this);}
+        void setPercent(int p){percent=Math.max(0,Math.min(100,p));invalidate();}
+        @Override protected void onDraw(Canvas c){
+            float cx=getWidth()/2f,cy=getHeight()/2f,r=Math.min(cx,cy)-dp(9);
+            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(10));paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setColor(Color.argb(95,220,220,220));c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,360,false,paint);
+            paint.setColor(WHITE);c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,percent*3.6f,false,paint);
+            paint.setStyle(Paint.Style.FILL);paint.setColor(WHITE);paint.setTextSize(dp(18));paint.setTextAlign(Paint.Align.CENTER);
+            c.drawText(percent+"%",cx,cy+dp(6),paint);
+        }
     }
 
     private void addHotspot(FrameLayout frame,int width,int height,float x,float y,float w,float h,Runnable action){
