@@ -172,10 +172,10 @@ public class MainActivity extends Activity {
         LinearLayout cpu=glassPanel();
         LinearLayout cpuRow=horizontal();
         homeRing=new CpuRingView();
-        cpuRow.addView(homeRing,new LinearLayout.LayoutParams(dp(88),dp(88)));
+        cpuRow.addView(homeRing,new LinearLayout.LayoutParams(dp(78),dp(78)));
         LinearLayout cpuInfo=vertical();
         cpuInfo.setGravity(Gravity.CENTER_VERTICAL);
-        cpuInfo.setPadding(dp(8),0,0,0);
+        cpuInfo.setPadding(dp(4),0,0,0);
         cpuInfo.addView(text("CPU",16,WHITE,false),lp(-1,26));
         homeCpuPercent=text("--%",22,WHITE,false);
         cpuInfo.addView(homeCpuPercent,lp(-1,32));
