@@ -288,9 +288,13 @@ public class MainActivity extends Activity {
             try{
                 android.view.Display display=getWindowManager().getDefaultDisplay();
                 android.view.Display.Mode best=null;
+                float bestDelta=Float.MAX_VALUE;
                 for(android.view.Display.Mode mode:display.getSupportedModes()){
-                    if(mode.getRefreshRate()>=119.0f &&
-                       (best==null || mode.getRefreshRate()>best.getRefreshRate())) best=mode;
+                    float rate=mode.getRefreshRate();
+                    if(rate>=119.0f && rate<=121.0f){
+                        float delta=Math.abs(rate-120.0f);
+                        if(delta<bestDelta){best=mode;bestDelta=delta;}
+                    }
                 }
                 if(best!=null){
                     android.view.WindowManager.LayoutParams attrs=getWindow().getAttributes();
