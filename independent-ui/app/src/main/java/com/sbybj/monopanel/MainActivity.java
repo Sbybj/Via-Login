@@ -53,7 +53,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         startedAt=SystemClock.elapsedRealtime();
         getWindow().setStatusBarColor(BLACK); getWindow().setNavigationBarColor(BLACK);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         log("应用启动"); showHome(); handler.post(monitor); requestRootAccess();
     }
     @Override protected void onDestroy(){ handler.removeCallbacks(monitor); RootInfoReader.stopCpuMonitor(); super.onDestroy(); }
@@ -176,8 +176,8 @@ public class MainActivity extends Activity {
         addHomeButton(row2,"▣","实时监控",()->showCpuMonitor());
         addHomeButton(row2,"▦","更多功能",()->showModules());
         addHomeButton(row2,"⏻","退出应用",()->finish());
-        page.addView(row1,lp(-1,dp(132))); 
-        page.addView(row2,lp(-1,dp(132)));
+        page.addView(row1,lp(-1,132)); 
+        page.addView(row2,lp(-1,132));
         LinearLayout.LayoutParams rowGap=lp(-1,dp(12));page.addView(new View(this),rowGap);
 
         LinearLayout footer=horizontal();footer.setGravity(Gravity.CENTER);
@@ -190,7 +190,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams footerP=lp(-1,54);footerP.topMargin=dp(18);page.addView(footer,footerP);
 
         setContentView(frame);
-        homeClock.run();
+        handler.removeCallbacks(homeClock); homeClock.run();
         if(homeCpuPercent!=null&&!cpuSamples.isEmpty()){
             int v=cpuSamples.get(cpuSamples.size()-1);
             homeCpuPercent.setText(v+"%");homeRing.setPercent(v);
@@ -288,6 +288,8 @@ public class MainActivity extends Activity {
                 double avg=0;for(int n:cpuSamples)avg+=n;
                 avg=cpuSamples.isEmpty()?0:avg/cpuSamples.size();
                 if(averageCpu!=null)averageCpu.setText(String.format(Locale.getDefault(),"CPU %.1f%%",(double)percent));
+                if(homeCpuPercent!=null)homeCpuPercent.setText(percent+"%");
+                if(homeRing!=null)homeRing.setPercent(percent);
             }
         }
         previousRootTotal=total;previousRootIdle=idle;
