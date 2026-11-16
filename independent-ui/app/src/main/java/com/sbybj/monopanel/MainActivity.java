@@ -362,6 +362,7 @@ public class MainActivity extends Activity {
             String status=granted?"Root 权限：已授权":"Root 权限：未授权 / 不可用";
             RootInfoReader.setLastResult(status,details);
             if(rootStatus!=null) rootStatus.setText(status+" · "+details);
+            if(homeRootStatus!=null) homeRootStatus.setText(granted?"已获取 Root 权限 · 功能已解锁":"Root 未授权 / 不可用");
             log(granted?"Root 授权成功":"Root 未授权或读取失败");
             if(granted){
                 // Start the persistent CPU reader only after the permission check has completed.
