@@ -143,6 +143,8 @@ public class MainActivity extends Activity {
         p.setBackground(glassBackground().getBackground());
         return p;
     }
+    private boolean espEnabled=false;
+    private TextView homeGpuValue, homeRamValue, homeFpsValue, homeBatteryValue;
     private void showHome(){
         FrameLayout frame=new FrameLayout(this);
         ImageView wallpaper=new ImageView(this);
@@ -150,102 +152,125 @@ public class MainActivity extends Activity {
         wallpaper.setScaleType(ImageView.ScaleType.CENTER_CROP);
         frame.addView(wallpaper,new FrameLayout.LayoutParams(-1,-1));
         View shade=new View(this);
-        shade.setBackgroundColor(Color.argb(55,0,0,0));
+        shade.setBackgroundColor(Color.argb(82,0,0,0));
         frame.addView(shade,new FrameLayout.LayoutParams(-1,-1));
 
         ScrollView scroll=new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
-        scroll.setBackgroundColor(Color.TRANSPARENT);
         LinearLayout page=vertical();
-        page.setPadding(dp(18),statusBarHeight()+dp(10),dp(18),navBarHeight()+dp(14));
+        page.setPadding(dp(18),statusBarHeight()+dp(10),dp(18),navBarHeight()+dp(94));
         scroll.addView(page,new ScrollView.LayoutParams(-1,-1));
         frame.addView(scroll,new FrameLayout.LayoutParams(-1,-1));
 
-        LinearLayout top=horizontal();
-        LinearLayout date=glassPanel();
-        homeTime=text("--:--",46,WHITE,false);
-        homeDate=text("--月--日 星期一",16,WHITE,false);
-        date.addView(homeTime,lp(-1,62));
-        date.addView(homeDate,lp(-1,28));
+        LinearLayout header=horizontal();
+        TextView chip=text("▦",30,WHITE,true);chip.setGravity(Gravity.CENTER);
+        chip.setBackground(glassBackground().getBackground());
+        header.addView(chip,lp(58,58));
+        LinearLayout title=vertical();title.setPadding(dp(12),0,0,0);
+        title.addView(text("游戏内核辅助",21,WHITE,true),lp(-1,32));
+        title.addView(text("极致性能 · 实时系统监控",12,Color.LTGRAY,false),lp(-1,22));
+        header.addView(title,new LinearLayout.LayoutParams(0,dp(58),1));
+        TextView rootBadge=text("● Root 检测中",12,WHITE,true);
+        rootBadge.setGravity(Gravity.CENTER);
+        rootBadge.setPadding(dp(10),0,dp(10),0);
+        rootBadge.setBackground(glassBackground().getBackground());
+        header.addView(rootBadge,lp(-2,38));
+        page.addView(header,lp(-1,66));
 
-        LinearLayout cpu=glassPanel();
+        LinearLayout cpu=metricCard("CPU","--%","实时占用 · Root 采样",true);
+        LinearLayout gpu=metricCard("GPU","--%","系统接口待接入",false);
+        LinearLayout ram=metricCard("RAM","--%","内存信息待接入",false);
+        homeCpuPercent=text("--%",29,WHITE,true);
+        cpu.removeAllViews();
+        cpu.addView(text("CPU",15,WHITE,true),lp(-1,24));
         LinearLayout cpuRow=horizontal();
         homeRing=new CpuRingView();
-        cpuRow.addView(homeRing,new LinearLayout.LayoutParams(dp(78),dp(78)));
-        LinearLayout cpuInfo=vertical();
-        cpuInfo.setGravity(Gravity.CENTER_VERTICAL);
-        cpuInfo.setPadding(dp(4),0,0,0);
-        cpuInfo.addView(text("CPU",16,WHITE,false),lp(-1,26));
-        homeCpuPercent=text("--%",22,WHITE,false);
-        cpuInfo.addView(homeCpuPercent,lp(-1,32));
-        cpuInfo.addView(text("实时占用",11,Color.LTGRAY,false),lp(-1,22));
-        cpuRow.addView(cpuInfo,new LinearLayout.LayoutParams(0,-1,1));
-        cpu.addView(cpuRow,new LinearLayout.LayoutParams(-1,-1));
+        cpuRow.addView(homeRing,new LinearLayout.LayoutParams(dp(72),dp(72)));
+        LinearLayout cpuInfo=vertical();cpuInfo.setPadding(dp(12),0,0,0);cpuInfo.setGravity(Gravity.CENTER_VERTICAL);
+        cpuInfo.addView(homeCpuPercent,lp(-1,40));
+        cpuInfo.addView(text("实时占用率",12,Color.LTGRAY,false),lp(-1,24));
+        cpuRow.addView(cpuInfo,new LinearLayout.LayoutParams(0,dp(76),1));
+        cpu.addView(cpuRow,lp(-1,78));
+        addCard(page,cpu,14);
+        addCard(page,gpu,12);
+        addCard(page,ram,12);
 
-        top.addView(date,new LinearLayout.LayoutParams(0,dp(116),1));
-        View topGap=new View(this);top.addView(topGap,new LinearLayout.LayoutParams(dp(12),1));
-        top.addView(cpu,new LinearLayout.LayoutParams(0,dp(116),1));
-        page.addView(top,lp(-1,116));
+        LinearLayout smallRow=horizontal();
+        LinearLayout fps=metricCard("FPS","--","等待游戏帧率接口",false);
+        LinearLayout battery=metricCard("电池","--","系统电池信息",false);
+        smallRow.addView(fps,new LinearLayout.LayoutParams(0,dp(100),1));
+        View gap=new View(this);smallRow.addView(gap,lp(10,1));
+        smallRow.addView(battery,new LinearLayout.LayoutParams(0,dp(100),1));
+        LinearLayout.LayoutParams sr=lp(-1,100);sr.topMargin=dp(12);page.addView(smallRow,sr);
 
-        LinearLayout rootCard=horizontal();
-        rootCard.setGravity(Gravity.CENTER_VERTICAL);
-        rootCard.setPadding(dp(16),dp(8),dp(16),dp(8));
-        rootCard.setBackground(glassBackground().getBackground());
-        TextView shield=text("✓",30,WHITE,true);
-        shield.setGravity(Gravity.CENTER);
-        rootCard.addView(shield,lp(48,52));
-        LinearLayout rootInfo=vertical();
-        rootInfo.setGravity(Gravity.CENTER_VERTICAL);
-        rootInfo.addView(text("Root 权限状态",17,WHITE,true),lp(-1,26));
-        homeRootStatus=text("正在检测授权…",13,Color.LTGRAY,false);
-        rootInfo.addView(homeRootStatus,lp(-1,24));
-        rootCard.addView(rootInfo,new LinearLayout.LayoutParams(0,dp(52),1));
-        LinearLayout.LayoutParams rp=lp(-1,72);rp.topMargin=dp(16);
-        page.addView(rootCard,rp);
+        LinearLayout sys=glassPanel();
+        sys.addView(text("系统信息",15,WHITE,true),lp(-1,28));
+        sys.addView(infoLine("设备",Build.MANUFACTURER+" "+Build.MODEL),lp(-1,28));
+        sys.addView(infoLine("Android",Build.VERSION.RELEASE),lp(-1,28));
+        sys.addView(infoLine("Root 状态",RootInfoReader.getLastStatus()==null?"检测中":RootInfoReader.getLastStatus()),lp(-1,28));
+        addCard(page,sys,12);
 
-        View spacer=new View(this);
-        page.addView(spacer,new LinearLayout.LayoutParams(1,0,1));
-
-        LinearLayout row1=horizontal(),row2=horizontal();
-        addHomeButton(row1,"◎","透视开关",()->{
-            if(moduleListener!=null)moduleListener.onAction("toggle_overlay");
-            showModules();
+        LinearLayout esp=horizontal();
+        esp.setGravity(Gravity.CENTER_VERTICAL);
+        esp.setPadding(dp(16),dp(10),dp(16),dp(10));
+        esp.setBackground(glassBackground().getBackground());
+        TextView target=text("◎",34,WHITE,true);target.setGravity(Gravity.CENTER);
+        esp.addView(target,lp(54,54));
+        LinearLayout espText=vertical();espText.setPadding(dp(10),0,0,0);
+        espText.addView(text("透视",18,WHITE,true),lp(-1,28));
+        espText.addView(text("功能接口预留 · 当前未接入",12,Color.LTGRAY,false),lp(-1,24));
+        esp.addView(espText,new LinearLayout.LayoutParams(0,dp(54),1));
+        TextView toggle=text(espEnabled?"开启":"关闭",13,WHITE,true);
+        toggle.setGravity(Gravity.CENTER);
+        toggle.setBackground(shape(espEnabled?Color.rgb(230,230,230):Color.rgb(65,65,65),22));
+        toggle.setTextColor(espEnabled?Color.BLACK:WHITE);
+        esp.addView(toggle,lp(76,36));
+        esp.setOnClickListener(v->{
+            espEnabled=!espEnabled;
+            toggle.setText(espEnabled?"开启":"关闭");
+            toggle.setTextColor(espEnabled?Color.BLACK:WHITE);
+            toggle.setBackground(shape(espEnabled?Color.rgb(230,230,230):Color.rgb(65,65,65),22));
+            log("透视接口请求："+(espEnabled?"开启":"关闭"));
+            if(moduleListener!=null)moduleListener.onAction("esp_toggle:"+espEnabled);
         });
-        addHomeButton(row1,"◉","透视设置",()->{
-            if(moduleListener!=null)moduleListener.onAction("overlay_settings");
-            showSettings();
-        });
-        addHomeButton(row1,"⚙","功能设置",()->showSettings());
-        addHomeButton(row2,"▣","实时监控",()->showCpuMonitor());
-        addHomeButton(row2,"▦","更多功能",()->showModules());
-        addHomeButton(row2,"⏻","退出应用",()->finish());
-        page.addView(row1,lp(-1,116));
-        LinearLayout.LayoutParams r2=lp(-1,116);r2.topMargin=dp(12);
-        page.addView(row2,r2);
+        addCard(page,esp,14);
 
-        LinearLayout footer=horizontal();
-        footer.setGravity(Gravity.CENTER_VERTICAL);
-        footer.setPadding(dp(16),0,dp(16),0);
-        footer.setBackground(glassBackground().getBackground());
-        TextView version=text("ⓘ  MonoPanel v1.0",14,WHITE,false);
-        footer.addView(version,new LinearLayout.LayoutParams(0,dp(52),1));
-        footer.addView(text("|",18,Color.LTGRAY,false),lp(20,52));
-        TextView status=text("●  稳定运行中…",14,WHITE,false);
-        footer.addView(status,new LinearLayout.LayoutParams(0,dp(52),1));
-        LinearLayout.LayoutParams fp=lp(-1,56);fp.topMargin=dp(18);
-        page.addView(footer,fp);
-
+        LinearLayout bottom=new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.CENTER);
+        bottom.setBackground(glassBackground().getBackground());
+        String[] tabs={"⌂\n首页","▤\n监控","◇\n功能","⚙\n设置"};
+        Runnable[] actions={()->showHome(),()->showCpuMonitor(),()->showApi(),()->showSettings()};
+        for(int i=0;i<tabs.length;i++){
+            final int index=i;
+            TextView tab=text(tabs[i],14,i==0?WHITE:Color.LTGRAY,i==0);
+            tab.setGravity(Gravity.CENTER);
+            tab.setOnClickListener(v->actions[index].run());
+            bottom.addView(tab,new LinearLayout.LayoutParams(0,dp(62),1));
+        }
+        FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,dp(66),Gravity.BOTTOM);
+        bp.setMargins(dp(16),0,dp(16),dp(12));
+        frame.addView(bottom,bp);
         setContentView(frame);
+
         handler.removeCallbacks(homeClock);
         homeClock.run();
+        String last=RootInfoReader.getLastStatus();
+        rootBadge.setText(last!=null && last.toLowerCase(Locale.ROOT).contains("授权")?"● Root 已授权":"● Root 状态");
         if(!cpuSamples.isEmpty()){
             int value=cpuSamples.get(cpuSamples.size()-1);
             homeCpuPercent.setText(value+"%");
             homeRing.setPercent(value);
         }
-        String last=RootInfoReader.getLastStatus();
-        homeRootStatus.setText(last==null||last.isEmpty()?"等待 Root 授权":last);
+    }
+
+    private LinearLayout metricCard(String label,String value,String detail,boolean wide){
+        LinearLayout card=glassPanel();
+        card.addView(text(label,15,WHITE,true),lp(-1,24));
+        card.addView(text(value,wide?27:24,WHITE,true),lp(-1,38));
+        card.addView(text(detail,11,Color.LTGRAY,false),lp(-1,22));
+        return card;
     }
     private void addHomeButton(LinearLayout row,String icon,String label,Runnable action){
         LinearLayout button=vertical();
