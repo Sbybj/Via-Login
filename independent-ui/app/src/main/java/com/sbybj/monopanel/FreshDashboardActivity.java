@@ -106,6 +106,11 @@ public class FreshDashboardActivity extends Activity {
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(5));
         bp.topMargin = dp(18);
         hero.addView(cpuBar, bp);
+        TextView cpuStatus = label("数据源：/proc/stat · 等待采样", 10, muted, false);
+        cpuStatus.setTag("cpu_status");
+        LinearLayout.LayoutParams csp = matchWrap();
+        csp.topMargin = dp(9);
+        hero.addView(cpuStatus, csp);
 
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.HORIZONTAL);
@@ -291,6 +296,23 @@ public class FreshDashboardActivity extends Activity {
         return c;
     }
 
+    private TextView findCpuStatusView() {
+        if (homePage == null) return null;
+        return findTaggedText(homePage, "cpu_status");
+    }
+
+    private TextView findTaggedText(View view, Object tag) {
+        if (tag.equals(view.getTag()) && view instanceof TextView) return (TextView) view;
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                TextView found = findTaggedText(group.getChildAt(i), tag);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
     private void refreshMetrics() {
         try {
             long[] now = readCpu();
@@ -300,14 +322,23 @@ public class FreshDashboardActivity extends Activity {
                 if (total > 0) {
                     int usage = (int)Math.max(0, Math.min(100, 100f * (total - idle) / total));
                     cpuValue.setText(String.format(Locale.US, "%d%%", usage));
+                    TextView status = findCpuStatusView();
+                    if (status != null) status.setText("数据源：/proc/stat · 正常读取");
                     if (monitorCpu != null) monitorCpu.setText(cpuValue.getText());
                     cpuBar.setProgress(usage);
                 }
             }
             if (now != null) { previousTotal = now[0]; previousIdle = now[1]; }
         } catch (Exception cpuError) {
+            String detail = cpuError.getClass().getSimpleName();
+            if (cpuError.getMessage() != null && !cpuError.getMessage().trim().isEmpty()) {
+                detail += ": " + cpuError.getMessage().trim();
+            }
+            android.util.Log.e("MonoPanel-CPU", "Failed to read /proc/stat", cpuError);
             if (cpuValue != null) cpuValue.setText("读取失败");
             if (monitorCpu != null) monitorCpu.setText("读取失败");
+            TextView status = findCpuStatusView();
+            if (status != null) status.setText("CPU 读取异常 · " + detail);
         }
         try {
             android.app.ActivityManager.MemoryInfo info = new android.app.ActivityManager.MemoryInfo();
