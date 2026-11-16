@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         log("应用启动"); showHome(); handler.post(monitor); requestRootAccess();
     }
-    @Override protected void onDestroy(){ handler.removeCallbacks(monitor); RootInfoReader.stopCpuMonitor(); super.onDestroy(); }
+    @Override protected void onDestroy(){ handler.removeCallbacks(monitor); handler.removeCallbacks(homeClock); RootInfoReader.stopCpuMonitor(); super.onDestroy(); }
 
     private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+.5f);}
     private GradientDrawable shape(int color,int radius){
