@@ -32,14 +32,14 @@ public class MainActivity extends Activity {
     private final Handler handler=new Handler(Looper.getMainLooper());
     private LinearLayout root;
     private TextView cpuValue, cpuDetail, runtimeValue, statusValue, rootStatus;
-    private long startedAt, previousTotal=-1, previousIdle=-1;
+    private long startedAt, previousRootTotal=-1, previousRootIdle=-1;
     private final ArrayList<String> logs=new ArrayList<>();
     private final String[] ids={"module_1","module_2","module_3","module_4"};
     private final boolean[] states={false,false,false,false};
     private final String[] names={"模块一","模块二","模块三","模块四"};
     private final String[] descriptions={"独立模块接口 A","独立模块接口 B","独立模块接口 C","独立模块接口 D"};
     private final Runnable monitor=new Runnable(){ public void run(){
-        if(cpuValue!=null){ sampleCpu(); updateRuntime(); }
+        if(cpuValue!=null){ sampleRootCpu(); updateRuntime(); }
         handler.postDelayed(this,2000);
     }};
 
@@ -161,17 +161,28 @@ public class MainActivity extends Activity {
         row.addView(labels,new LinearLayout.LayoutParams(0,dp(54),1));row.addView(text("›",24,MUTED,false),lp(30,48));
         row.setOnClickListener(v->action.run());parent.addView(row,lp(-1,58));
     }
-    private void sampleCpu(){
-        try{
-            BufferedReader br=new BufferedReader(new FileReader("/proc/stat"));String line=br.readLine();br.close();
-            if(line==null||!line.startsWith("cpu "))throw new Exception("cpu stats unavailable");
-            String[] p=line.trim().split("\\s+");long total=0;for(int i=1;i<p.length;i++)total+=Long.parseLong(p[i]);
-            long idle=Long.parseLong(p[4])+(p.length>5?Long.parseLong(p[5]):0);
-            if(previousTotal>=0){long dt=total-previousTotal,di=idle-previousIdle;if(dt>0){
-                int percent=(int)Math.max(0,Math.min(100,Math.round((dt-di)*100.0/dt)));
-                cpuValue.setText(percent+"%");cpuDetail.setText("系统总体 CPU · 每 2 秒更新");
-            }}previousTotal=total;previousIdle=idle;
-        }catch(Exception e){cpuValue.setText("N/A");cpuDetail.setText("系统未开放 CPU 统计权限");}
+    private void sampleRootCpu(){
+        RootInfoReader.readCpuStat(this,(granted,counters)->{
+            if(cpuValue==null)return;
+            if(!granted||counters==null||counters.length<2){
+                cpuValue.setText("N/A");
+                cpuDetail.setText("Root 未授权，无法读取 /proc/stat");
+                previousRootTotal=-1;previousRootIdle=-1;return;
+            }
+            long total=counters[0], idle=counters[1];
+            if(previousRootTotal>=0){
+                long dt=total-previousRootTotal, di=idle-previousRootIdle;
+                if(dt>0){
+                    int percent=(int)Math.max(0,Math.min(100,Math.round((dt-di)*100.0/dt)));
+                    cpuValue.setText(percent+"%");
+                    cpuDetail.setText("Root 读取 /proc/stat · 实时刷新");
+                }
+            } else {
+                cpuValue.setText("--%");
+                cpuDetail.setText("Root 已连接，正在采集基准值…");
+            }
+            previousRootTotal=total;previousRootIdle=idle;
+        });
     }
     private void updateRuntime(){
         long sec=(SystemClock.elapsedRealtime()-startedAt)/1000;
