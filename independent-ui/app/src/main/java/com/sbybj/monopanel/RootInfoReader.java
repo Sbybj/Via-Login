@@ -30,7 +30,7 @@ public final class RootInfoReader {
         cpuThread=new Thread(()->{
             Process process=null;
             try{
-                process=new ProcessBuilder("su","-c","while true; do cat /proc/stat; sleep 0.1; done")
+                process=new ProcessBuilder("su","-c","while true; do cat /proc/stat; sleep 0.5; done")
                         .redirectErrorStream(true).start();
                 cpuProcess=process;
                 BufferedReader reader=new BufferedReader(new InputStreamReader(process.getInputStream()));
