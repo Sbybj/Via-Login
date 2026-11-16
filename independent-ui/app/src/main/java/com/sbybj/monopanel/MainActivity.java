@@ -45,16 +45,16 @@ public class MainActivity extends Activity {
     private final String[] descriptions={"独立模块接口 A","独立模块接口 B","独立模块接口 C","独立模块接口 D"};
     private final Runnable monitor=new Runnable(){ public void run(){
         if(cpuHistory!=null){ sampleRootCpu(); updateRuntime(); }
-        handler.postDelayed(this,2000);
+        handler.postDelayed(this,100);
     }};
 
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
         startedAt=SystemClock.elapsedRealtime();
         getWindow().setStatusBarColor(BLACK); getWindow().setNavigationBarColor(BLACK);
-        log("应用启动"); showHome(); handler.post(monitor); requestRootAccess();
+        log("应用启动"); showHome(); handler.post(monitor); RootInfoReader.startCpuMonitor(this,(granted,counters)->onCpuSample(granted,counters)); requestRootAccess();
     }
-    @Override protected void onDestroy(){ handler.removeCallbacks(monitor); super.onDestroy(); }
+    @Override protected void onDestroy(){ handler.removeCallbacks(monitor); RootInfoReader.stopCpuMonitor(); super.onDestroy(); }
 
     private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+.5f);}
     private GradientDrawable shape(int color,int radius){
@@ -76,7 +76,7 @@ public class MainActivity extends Activity {
     private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));}
     private void initPage(String title){
         FrameLayout frame=new FrameLayout(this);
-        frame.setBackgroundColor(BLACK);
+        frame.setBackgroundResource(R.drawable.wallpaper);
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true);
         scroll.setBackgroundColor(Color.TRANSPARENT);
         root=vertical(); root.setPadding(dp(18),dp(18),dp(18),dp(24)); scroll.addView(root);
@@ -189,27 +189,24 @@ public class MainActivity extends Activity {
         row.setOnClickListener(v->action.run());parent.addView(row,lp(-1,58));
     }
     private final ArrayList<Integer> cpuSamples=new ArrayList<>();
-    private void sampleRootCpu(){
-        RootInfoReader.readCpuStat(this,(granted,counters)->{
-            if(cpuHistory==null)return;
-            if(!granted||counters==null||counters.length<2){
-                cpuHistory.invalidate();averageCpu.setText("平均 --.-%");
-                previousRootTotal=-1;previousRootIdle=-1;return;
+    private void onCpuSample(boolean granted,long[] counters){
+        if(!granted||counters==null||counters.length<2){
+            if(cpuHistory!=null){ cpuHistory.invalidate(); averageCpu.setText("CPU --.-%"); }
+            previousRootTotal=-1; previousRootIdle=-1; return;
+        }
+        long total=counters[0], idle=counters[1];
+        if(previousRootTotal>=0){
+            long dt=total-previousRootTotal, di=idle-previousRootIdle;
+            if(dt>0){
+                int percent=(int)Math.max(0,Math.min(100,Math.round((dt-di)*100.0/dt)));
+                cpuSamples.add(percent);while(cpuSamples.size()>60)cpuSamples.remove(0);
+                if(cpuHistory!=null)cpuHistory.setSamples(cpuSamples);
+                double avg=0;for(int n:cpuSamples)avg+=n;
+                avg=cpuSamples.isEmpty()?0:avg/cpuSamples.size();
+                if(averageCpu!=null)averageCpu.setText(String.format(Locale.getDefault(),"CPU %.1f%%",percent));
             }
-            long total=counters[0], idle=counters[1];
-            if(previousRootTotal>=0){
-                long dt=total-previousRootTotal, di=idle-previousRootIdle;
-                if(dt>0){
-                    int percent=(int)Math.max(0,Math.min(100,Math.round((dt-di)*100.0/dt)));
-                    cpuSamples.add(percent);while(cpuSamples.size()>30)cpuSamples.remove(0);
-                    cpuHistory.setSamples(cpuSamples);
-                    double avg=0;for(int n:cpuSamples)avg+=n;
-                    avg=cpuSamples.isEmpty()?0:avg/cpuSamples.size();
-                    averageCpu.setText(String.format(Locale.getDefault(),"平均 %.1f%%",avg));
-                }
-            }
-            previousRootTotal=total;previousRootIdle=idle;
-        });
+        }
+        previousRootTotal=total;previousRootIdle=idle;
     }
 
     /** Compact live CPU history chart, styled like the supplied monitoring widget. */
