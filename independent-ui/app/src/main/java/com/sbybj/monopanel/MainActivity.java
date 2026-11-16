@@ -61,9 +61,9 @@ public class MainActivity extends Activity {
         GradientDrawable d=new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d;
     }
     private GradientDrawable cardBg(){
-        // Translucent glass surface: deliberately no bright outline or edge glow.
+        // Keep the supplied wallpaper crisp; use a lighter translucent glass tint without blur.
         GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.argb(92,116,124,142),Color.argb(66,35,40,54),Color.argb(78,18,21,31)});
+                new int[]{Color.argb(52,116,124,142),Color.argb(34,35,40,54),Color.argb(42,18,21,31)});
         d.setCornerRadius(dp(24));
         return d;
     }
